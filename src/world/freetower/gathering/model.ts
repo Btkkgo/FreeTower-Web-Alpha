@@ -1,3 +1,4 @@
+import type { BuildingInstance } from "../building/types.ts";
 import raw from "../../../../server/freetower_resources.json" with { type: "json" };
 import type { Point, MovementMode } from "../model.ts";
 export type ResourceType = "tree" | "rock";
@@ -59,6 +60,7 @@ export interface ResourceNodeState {
   respawnAt: number;
 }
 export interface ResourceState {
+  buildings?: Record<string, BuildingInstance>;
   version: number;
   nodes: Record<string, ResourceNodeState>;
   inventory: Record<string, number>;
@@ -170,6 +172,7 @@ export class GatheringController {
   position: Point = { x: 0, z: 18 };
   mode: MovementMode = "land";
   ready = false;
+  suspended = false;
   wheel: WheelCategory | null = null;
   highlight: number | null = null;
   action: (GatherAction & { confirmed: boolean; sent: boolean }) | null = null;
@@ -217,6 +220,7 @@ export class GatheringController {
     this.feedbackUntil = now + 2300;
   }
   select(id: string) {
+    if (this.suspended) return;
     if (!this.state?.nodes[id] || this.state.nodes[id].depleted) return;
     this.targetId = id;
     this.approachId =
@@ -226,13 +230,14 @@ export class GatheringController {
         : null;
   }
   openWheel(category: WheelCategory) {
-    if (!this.ready) return;
+    if (!this.ready || this.suspended) return;
     this.cancelAction();
     this.wheel = category;
     this.highlight = null;
     this.approachId = null;
   }
   choose(id: string) {
+    if (this.suspended) return;
     const h = selectHandItem(this.hands, id, this.state?.inventory ?? {});
     if (!h) {
       this.note("库存中暂无此物品");
@@ -246,7 +251,7 @@ export class GatheringController {
     this.qConsumed = true;
   }
   switchHand() {
-    if (!this.ready) return;
+    if (!this.ready || this.suspended) return;
     this.cancelAction();
     this.hands = {
       ...this.hands,
@@ -255,7 +260,7 @@ export class GatheringController {
     this.send({ type: "hands-set", hands: this.hands });
   }
   qDown(now: number) {
-    if (this.qStarted !== null || !this.ready) return;
+    if (this.qStarted !== null || !this.ready || this.suspended) return;
     this.qStarted = now;
     this.qConsumed = false;
   }
@@ -293,6 +298,7 @@ export class GatheringController {
     this.feedback = "";
   }
   use(now = Date.now()) {
+    if (this.suspended) return;
     if (!this.ready || this.wheel) return;
     if (this.action || now + this.serverOffset < this.cooldownUntil) {
       this.note("工具冷却中 · Recovering", now);

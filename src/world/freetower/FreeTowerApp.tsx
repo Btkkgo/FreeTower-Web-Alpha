@@ -1,3 +1,4 @@
+import BuildingHUD, { useBuilding } from "./building/BuildingHUD";
 import {
   useCallback,
   useEffect,
@@ -52,9 +53,22 @@ export default function FreeTowerApp() {
     connected,
     detail?.room.id,
   );
+  const building = useBuilding(
+    (message) => {
+      if (ws.current?.readyState === WebSocket.OPEN)
+        ws.current.send(JSON.stringify(message));
+    },
+    connected,
+    detail?.room.id,
+  );
+  building.selfId = user?.id ?? "";
+  building.players = players.filter((p) => p.world === "freetower");
   const serverOffset = useRef(0);
   useEffect(() => {
-    if (detail?.state.freeTower) gathering.applyState(detail.state.freeTower);
+    if (detail?.state.freeTower) {
+      gathering.applyState(detail.state.freeTower);
+      building.applyState(detail.state.freeTower);
+    }
   }, [detail?.state.freeTower, gathering]);
   useEffect(() => {
     const self = players.find((p) => p.id === user?.id);
@@ -151,6 +165,11 @@ export default function FreeTowerApp() {
             attempt = 0;
             setConnected(true);
           }
+        } else if (
+          msg.type === "building-result" ||
+          msg.type === "building-error"
+        ) {
+          building.handle(msg);
         } else if (msg.type === "resource-hit") {
           gathering.hits[msg.resourceId] = msg;
           playGatherHit(msg);
@@ -173,6 +192,7 @@ export default function FreeTowerApp() {
         } else if (msg.type === "state") {
           serverOffset.current = msg.serverTime - Date.now();
           gathering.serverOffset = serverOffset.current;
+          building.serverOffset = serverOffset.current;
           setDetail((d) =>
             d &&
             d.room.id === roomId &&
@@ -243,6 +263,7 @@ export default function FreeTowerApp() {
     <main className="ft-app">
       <div className="ft-world">
         <FreeTowerWorld
+          building={building}
           gathering={gathering}
           players={players}
           selfId={user?.id}
@@ -256,6 +277,11 @@ export default function FreeTowerApp() {
       {detail ? (
         <>
           <GatheringHUD controller={gathering} debug={debug} />
+          <BuildingHUD
+            controller={building}
+            gathering={gathering}
+            debug={debug}
+          />
           <header className="ft-heading">
             <div className="ft-wordmark">
               <span className="ft-sigil">◇</span> FREE<span>TOWER</span>

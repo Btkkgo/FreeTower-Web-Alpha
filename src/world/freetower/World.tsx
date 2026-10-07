@@ -1,3 +1,6 @@
+import BuildingScene from "./building/BuildingScene";
+import type { BuildingController } from "./building/controller";
+import { blocksMovement } from "./building/validation";
 import {
   Canvas,
   useFrame,
@@ -54,6 +57,7 @@ export interface Readout {
   region: string;
 }
 interface Props {
+  building: BuildingController;
   gathering: GatheringController;
   players: Player[];
   selfId?: string;
@@ -107,6 +111,7 @@ function Landscape({ onTarget }: { onTarget: (p: Point) => void }) {
   return (
     <mesh
       geometry={mesh}
+      name="ft-placement-ground"
       receiveShadow
       onPointerDown={(e: ThreeEvent<PointerEvent>) => {
         if (e.button === 0) {
@@ -445,6 +450,7 @@ function Runtime({
   onReadout,
   debug,
   gathering,
+  building,
 }: Props) {
   const { camera, gl } = useThree();
   const keys = useRef(new Set<string>()),
@@ -522,7 +528,7 @@ function Runtime({
       };
     const down = (e: PointerEvent) => {
       canvas.focus({ preventScroll: true });
-      if (e.button === 2) {
+      if (e.button === 2 && !building.active) {
         orbit.current.drag = true;
         orbit.current.x = e.clientX;
         orbit.current.y = e.clientY;
@@ -575,8 +581,16 @@ function Runtime({
       canvas.removeEventListener("wheel", wheel);
       canvas.removeEventListener("contextmenu", context);
     };
-  }, [gl]);
+  }, [gl, building]);
   useFrame(({ clock }, dt) => {
+    building.actor = motion.current.position;
+    building.movementMode = motion.current.mode;
+    building.tick();
+    gathering.suspended = building.active;
+    if (building.active) {
+      gathering.cancelInput();
+      route.current = [];
+    }
     gathering.position = motion.current.position;
     gathering.mode = motion.current.mode;
     gathering.tick();
@@ -632,6 +646,14 @@ function Runtime({
           .map((n) => n.treeIndex)
           .filter((n): n is number => n !== undefined),
       );
+      if (
+        blocksMovement(
+          m.position,
+          Object.values(building.state?.buildings ?? {}),
+          before,
+        )
+      )
+        m.position = before;
       stuckTime.current =
         Math.hypot(m.position.x - before.x, m.position.z - before.z) < 0.002
           ? stuckTime.current + dt
@@ -720,6 +742,13 @@ function Runtime({
     }
   });
   const onTarget = (p: Point) => {
+    if (building.editing) {
+      building.setGhost(p);
+      building.confirm();
+      return;
+    }
+    if (building.active) return;
+    building.selectedId = null;
     if (ready && !gathering.locked()) {
       gathering.approachId = null;
       route.current = [constrainPosition(p, motion.current.position)];
@@ -731,6 +760,7 @@ function Runtime({
       <Landscape onTarget={onTarget} />
       <Forest />
       <ResourceScene controller={gathering} />
+      <BuildingScene controller={building} />
       <Rocks />
       <GroundDetails />
       <Water onTarget={onTarget} />

@@ -18,12 +18,14 @@ import (
 )
 
 type RuntimeRoom struct {
-	gatherUsers map[string]*gatheringUser
-	deleted     bool
-	mu          sync.Mutex
-	record      RoomRecord
-	clients     map[*Client]bool
-	lastPersist int64
+	buildingLocks map[string]buildingLock
+	buildingLast  map[string]int64
+	gatherUsers   map[string]*gatheringUser
+	deleted       bool
+	mu            sync.Mutex
+	record        RoomRecord
+	clients       map[*Client]bool
+	lastPersist   int64
 }
 type App struct {
 	store      *Store
@@ -46,7 +48,11 @@ func newApp(store *Store, staticDir string) (*App, error) {
 	for _, r := range records {
 		r.State.UpdatedAt = nowMS()
 		r.Room.OnlineCount = 0
-		a.rooms[r.Room.ID] = &RuntimeRoom{record: r, clients: map[*Client]bool{}}
+		rr := &RuntimeRoom{record: r, clients: map[*Client]bool{}}
+		if err := rr.advanceBuildings(nowMS(), true, nil, func(record RoomRecord) error { return store.saveRoom(ctx, record) }); err != nil {
+			return nil, err
+		}
+		a.rooms[r.Room.ID] = rr
 	}
 	go a.runTicker()
 	return a, nil
@@ -158,7 +164,7 @@ func roomDetail(rr *RuntimeRoom) map[string]any {
 	r := rr.record.Room
 	r.MemberCount = len(rr.record.Members)
 	r.OnlineCount = len(rr.players())
-	return map[string]any{"room": r, "state": rr.record.State, "serverTime": nowMS()}
+	return map[string]any{"room": r, "state": publicState(rr.record.State), "serverTime": nowMS()}
 }
 func (a *App) listRooms(w http.ResponseWriter, r *http.Request) {
 	u, ok := a.requireUser(w, r)
@@ -399,9 +405,9 @@ func (a *App) action(w http.ResponseWriter, r *http.Request) {
 	}
 	rr.record.State = next
 	rr.lastPersist = at
-	rr.broadcast(map[string]any{"type": "state", "state": next, "serverTime": at})
+	rr.broadcast(map[string]any{"type": "state", "state": publicState(next), "serverTime": at})
 	rr.broadcast(map[string]any{"type": "event", "text": u.Username + " · " + msg, "at": at})
-	writeJSON(w, 200, map[string]any{"state": next, "message": msg, "serverTime": at})
+	writeJSON(w, 200, map[string]any{"state": publicState(next), "message": msg, "serverTime": at})
 }
 func (a *App) static(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" && r.Method != "HEAD" {
@@ -446,6 +452,9 @@ func (a *App) runTicker() {
 				}
 				at := nowMS()
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				if err := rr.advanceBuildings(at, false, nil, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
+					log.Printf("building timer save failed: %v", err)
+				}
 				if err := rr.respawnGathering(at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
 					log.Printf("resource respawn save failed: %v", err)
 				}
@@ -456,7 +465,7 @@ func (a *App) runTicker() {
 				active := len(rr.clients) > 0
 				rr.tick(at)
 				if active {
-					rr.broadcast(map[string]any{"type": "state", "state": rr.record.State, "serverTime": at})
+					rr.broadcast(map[string]any{"type": "state", "state": publicState(rr.record.State), "serverTime": at})
 					if at-rr.lastPersist >= 15000 {
 						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 						err := a.store.saveRoom(ctx, rr.record)

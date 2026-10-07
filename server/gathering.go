@@ -23,18 +23,21 @@ type GatherAction struct {
 	EndsAt     int64  `json:"endsAt"`
 }
 type ResourceNodeState struct {
-	ID            string `json:"id"`
-	DefinitionID  string `json:"definitionId"`
-	Position      Vec2   `json:"position"`
-	Durability    int    `json:"durability"`
-	MaxDurability int    `json:"maxDurability"`
-	Depleted      bool   `json:"depleted"`
-	RespawnAt     int64  `json:"respawnAt"`
+	Scale         float64 `json:"scale,omitempty"`
+	ID            string  `json:"id"`
+	DefinitionID  string  `json:"definitionId"`
+	Position      Vec2    `json:"position"`
+	Durability    int     `json:"durability"`
+	MaxDurability int     `json:"maxDurability"`
+	Depleted      bool    `json:"depleted"`
+	RespawnAt     int64   `json:"respawnAt"`
 }
 type FreeTowerState struct {
-	Version   int                          `json:"version"`
-	Nodes     map[string]ResourceNodeState `json:"nodes"`
-	Inventory map[string]int               `json:"inventory"`
+	Buildings        map[string]BuildingInstance  `json:"buildings,omitempty"`
+	BuildingReceipts map[string]BuildingReceipt   `json:"buildingReceipts,omitempty"`
+	Version          int                          `json:"version"`
+	Nodes            map[string]ResourceNodeState `json:"nodes"`
+	Inventory        map[string]int               `json:"inventory"`
 }
 type ToolDefinition struct {
 	ID                 string   `json:"id"`
@@ -291,7 +294,7 @@ func (rr *RuntimeRoom) hitGather(c *Client, rid, tid, id string, at int64, save 
 	u.Consumed = true
 	u.LastID = id
 	u.CooldownUntil = a.StartedAt + tool.Cooldown
-	rr.broadcast(map[string]any{"type": "state", "state": next, "serverTime": at})
+	rr.broadcast(map[string]any{"type": "state", "state": publicState(next), "serverTime": at})
 	rr.broadcast(map[string]any{"type": "resource-hit", "resourceId": rid, "userId": c.user.ID, "actionId": id, "at": at, "depleted": node.Depleted})
 	return nil
 }

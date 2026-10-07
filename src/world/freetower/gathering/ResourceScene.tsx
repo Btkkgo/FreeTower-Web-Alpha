@@ -62,6 +62,7 @@ export default function ResourceScene({
   const selected = c.state?.nodes[c.targetId ?? ""];
   const pointer = (e: ThreeEvent<PointerEvent>, id: string) => {
     if (e.button !== 0 || c.wheel) return;
+    if (c.suspended) return;
     e.stopPropagation();
     if (c.targetId === id) c.use();
     else c.select(id);
@@ -80,6 +81,7 @@ export default function ResourceScene({
             scale={n.scale}
             onPointerDown={(e) => pointer(e, n.id)}
             onPointerOver={(e) => {
+              if (c.suspended) return;
               e.stopPropagation();
               if (!c.state?.nodes[n.id]?.depleted) c.hoverId = n.id;
             }}

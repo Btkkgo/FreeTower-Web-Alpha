@@ -119,13 +119,16 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 		rr.syncGatherUser(c.user.ID)
 	}
 	rr.broadcastPresence()
-	b, _ := json.Marshal(map[string]any{"type": "state", "state": rr.record.State, "serverTime": nowMS()})
+	b, _ := json.Marshal(map[string]any{"type": "state", "state": publicState(rr.record.State), "serverTime": nowMS()})
 	c.send <- b
 	rr.mu.Unlock()
 	go c.writePump()
 	c.readPump(a, rr)
 	rr.mu.Lock()
 	rr.tick(nowMS())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = rr.advanceBuildings(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
+	cancel()
 	delete(rr.clients, c)
 	rr.broadcastPresence()
 	rr.mu.Unlock()
@@ -184,6 +187,31 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			continue
 		}
 		switch msg.Type {
+		case "place-building", "begin-building-move", "move-building", "cancel-building-move", "renew-building-move":
+			var q BuildingRequest
+			if json.Unmarshal(b, &q) != nil {
+				continue
+			}
+			rr.mu.Lock()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			result, failure := rr.buildingCommand(c, msg.Type, q, nowMS(), func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
+			cancel()
+			var payload []byte
+			if failure != nil {
+				code := "invalid"
+				if e, ok := failure.(*gatherError); ok {
+					code = e.Code
+				}
+				payload, _ = json.Marshal(map[string]any{"type": "building-error", "requestId": q.RequestID, "code": code, "message": failure.Error()})
+			} else {
+				payload, _ = json.Marshal(map[string]any{"type": "building-result", "requestId": result.RequestID, "buildingId": result.BuildingID, "moveToken": result.MoveToken})
+			}
+			select {
+			case c.send <- payload:
+			default:
+				c.close()
+			}
+			rr.mu.Unlock()
 		case "hands-set", "gather-start", "resource-hit", "gather-cancel":
 			rr.mu.Lock()
 			at := nowMS()
@@ -238,7 +266,7 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			}
 			rr.tick(now.UnixMilli())
 			if c.player.World == "freetower" {
-				c.player.Position = freeTowerPosition(msg.Position)
+				c.player.Position = buildingMovement(rr.record.State.FreeTower, c.player.Position, freeTowerPosition(msg.Position))
 				c.player.MovementMode, c.player.Elevation = freeTowerLocomotion(c.player.Position)
 				if distance > .01 || c.player.MovementMode == "swimming" {
 					rr.cancelGather(c)

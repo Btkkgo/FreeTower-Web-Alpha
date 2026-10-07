@@ -1,0 +1,69 @@
+{
+  "placementRange": 14,
+  "rateLimitMs": 500,
+  "moveLockMs": 30000,
+  "playerRadius": 0.65,
+  "protectedZones": [
+    { "id": "freetower", "x": 16, "z": 340, "radius": 32 },
+    { "id": "ancient-ruins", "x": 0, "z": -58, "radius": 16 }
+  ],
+  "definitions": [
+    {
+      "id": "campfire",
+      "assetId": "building.campfire.basic",
+      "displayName": "Campfire",
+      "footprint": { "width": 2, "depth": 2 },
+      "cost": [
+        { "itemId": "wood", "quantity": 4 },
+        { "itemId": "stone", "quantity": 3 }
+      ],
+      "constructionSeconds": 5,
+      "rotationStep": 30,
+      "placementRules": {
+        "maxSlope": 0.35,
+        "maxHeightDelta": 0.8,
+        "minElevation": 0.7,
+        "riverBuffer": 1.2,
+        "coastBuffer": 2
+      }
+    },
+    {
+      "id": "workbench",
+      "assetId": "building.workbench.basic",
+      "displayName": "Workbench",
+      "footprint": { "width": 3, "depth": 2 },
+      "cost": [
+        { "itemId": "wood", "quantity": 8 },
+        { "itemId": "stone", "quantity": 2 }
+      ],
+      "constructionSeconds": 10,
+      "rotationStep": 30,
+      "placementRules": {
+        "maxSlope": 0.35,
+        "maxHeightDelta": 0.8,
+        "minElevation": 0.7,
+        "riverBuffer": 1.2,
+        "coastBuffer": 2
+      }
+    },
+    {
+      "id": "small-shelter",
+      "assetId": "building.shelter.basic",
+      "displayName": "Small Shelter",
+      "footprint": { "width": 5, "depth": 4 },
+      "cost": [
+        { "itemId": "wood", "quantity": 16 },
+        { "itemId": "stone", "quantity": 8 }
+      ],
+      "constructionSeconds": 20,
+      "rotationStep": 30,
+      "placementRules": {
+        "maxSlope": 0.35,
+        "maxHeightDelta": 0.8,
+        "minElevation": 0.7,
+        "riverBuffer": 1.2,
+        "coastBuffer": 2
+      }
+    }
+  ]
+}

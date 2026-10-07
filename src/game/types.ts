@@ -1,4 +1,8 @@
 import type {
+  BuildingMessage,
+  BuildingReply,
+} from "../world/freetower/building/types";
+import type {
   HandState,
   GatherAction,
   ResourceState,
@@ -175,6 +179,7 @@ export interface ActionResult {
   serverTime: number;
 }
 export type ClientMessage =
+  | BuildingMessage
   | GatheringMessage
   | {
       type: "move";
@@ -188,6 +193,7 @@ export type ClientMessage =
   | { type: "whistle" }
   | { type: "chat"; text: string };
 export type ServerMessage =
+  | BuildingReply
   | ({ type: "resource-hit" } & ResourceHit)
   | { type: "gather-error"; code: string; message: string }
   | { type: "roomDeleted"; roomId: string }
