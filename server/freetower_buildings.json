@@ -64,6 +64,34 @@
         "riverBuffer": 1.2,
         "coastBuffer": 2
       }
+    },
+    {
+      "id": "farm-plot",
+      "assetId": "building.farm-plot.basic",
+      "displayName": "Farm Plot",
+      "footprint": {
+        "width": 3,
+        "depth": 3
+      },
+      "cost": [
+        {
+          "itemId": "wood",
+          "quantity": 4
+        },
+        {
+          "itemId": "stone",
+          "quantity": 2
+        }
+      ],
+      "constructionSeconds": 3,
+      "rotationStep": 30,
+      "placementRules": {
+        "maxSlope": 0.35,
+        "maxHeightDelta": 0.8,
+        "minElevation": 0.7,
+        "riverBuffer": 1.2,
+        "coastBuffer": 2
+      }
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type {LifeMessage,LifeReply} from "../world/freetower/life/types";
 import type {
   BuildingMessage,
   BuildingReply,
@@ -179,6 +180,7 @@ export interface ActionResult {
   serverTime: number;
 }
 export type ClientMessage =
+  | LifeMessage
   | BuildingMessage
   | GatheringMessage
   | {
@@ -193,6 +195,7 @@ export type ClientMessage =
   | { type: "whistle" }
   | { type: "chat"; text: string };
 export type ServerMessage =
+  | LifeReply
   | BuildingReply
   | ({ type: "resource-hit" } & ResourceHit)
   | { type: "gather-error"; code: string; message: string }

@@ -33,6 +33,9 @@ type ResourceNodeState struct {
 	RespawnAt     int64   `json:"respawnAt"`
 }
 type FreeTowerState struct {
+	Life             *LifeState                   `json:"life,omitempty"`
+	Personal         map[string]PersonalState     `json:"personal,omitempty"`
+	LifeReceipts     map[string]LifeReceipt       `json:"lifeReceipts,omitempty"`
 	Buildings        map[string]BuildingInstance  `json:"buildings,omitempty"`
 	BuildingReceipts map[string]BuildingReceipt   `json:"buildingReceipts,omitempty"`
 	Version          int                          `json:"version"`
@@ -175,6 +178,9 @@ func (rr *RuntimeRoom) setHands(c *Client, h HandState) error {
 		if id == "empty" || toolDefinition(id) != nil {
 			continue
 		}
+		if personal, ok := rr.record.State.FreeTower.Personal[c.user.ID]; ok && personal.Inventory[id] > 0 {
+			continue
+		}
 		if (id == "wood" || id == "stone") && rr.record.State.FreeTower.Inventory[id] > 0 {
 			continue
 		}
@@ -188,6 +194,9 @@ func (rr *RuntimeRoom) setHands(c *Client, h HandState) error {
 	return nil
 }
 func (rr *RuntimeRoom) validateGather(c *Client, rid, tid string) (*ToolDefinition, ResourceNodeState, error) {
+	if rr.record.State.FreeTower != nil && rr.record.State.FreeTower.Life != nil && liveFishing(rr.record.State.FreeTower.Life.Fishing[c.user.ID]) {
+		return nil, ResourceNodeState{}, gatherErr("busy", "Finish fishing first")
+	}
 	if err := rr.gatheringParticipant(c); err != nil {
 		return nil, ResourceNodeState{}, err
 	}

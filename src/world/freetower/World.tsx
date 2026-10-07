@@ -1,3 +1,6 @@
+import LifeScene from "./life/LifeScene";
+import type {LifeController} from "./life/controller";
+import {activeItem} from "./gathering/model";
 import BuildingScene from "./building/BuildingScene";
 import type { BuildingController } from "./building/controller";
 import { blocksMovement } from "./building/validation";
@@ -57,6 +60,7 @@ export interface Readout {
   region: string;
 }
 interface Props {
+  life: LifeController;
   building: BuildingController;
   gathering: GatheringController;
   players: Player[];
@@ -451,6 +455,7 @@ function Runtime({
   debug,
   gathering,
   building,
+  life,
 }: Props) {
   const { camera, gl } = useThree();
   const keys = useRef(new Set<string>()),
@@ -586,7 +591,14 @@ function Runtime({
     building.actor = motion.current.position;
     building.movementMode = motion.current.mode;
     building.tick();
-    gathering.suspended = building.active;
+    life.position=motion.current.position;
+    life.facing=motion.current.facing;
+    life.mode=motion.current.mode;
+    life.tool=activeItem(gathering.hands);
+    if(building.active && life.active)life.cancel();
+    gathering.suspended = building.active || life.fishing;
+    if(life.active){gathering.approachId=null;route.current=[];}
+
     if (building.active) {
       gathering.cancelInput();
       route.current = [];
@@ -748,6 +760,9 @@ function Runtime({
       return;
     }
     if (building.active) return;
+    if (life.aiming) { life.cast(p); return; }
+    if (life.fishing) return;
+    life.selectedPlot=null;life.selectedAnimal=null;
     building.selectedId = null;
     if (ready && !gathering.locked()) {
       gathering.approachId = null;
@@ -761,6 +776,7 @@ function Runtime({
       <Forest />
       <ResourceScene controller={gathering} />
       <BuildingScene controller={building} />
+      <LifeScene controller={life} building={building}/>
       <Rocks />
       <GroundDetails />
       <Water onTarget={onTarget} />
@@ -772,6 +788,7 @@ function Runtime({
         name="You"
         color="#496b79"
         gathering={gathering}
+        life={life}
       />
       {players
         .filter((p) => p.id !== selfId && p.world === "freetower")
@@ -782,6 +799,7 @@ function Runtime({
             name={p.username}
             color={p.color}
             gathering={gathering}
+        life={life}
           />
         ))}
       <mesh ref={marker} rotation={[-Math.PI / 2, 0, 0]}>

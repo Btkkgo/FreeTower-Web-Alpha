@@ -256,7 +256,7 @@ export default function GatheringHUD({
                 id &&
                 (id === "empty" ||
                   Boolean(config.tools.find((t) => t.id === id)) ||
-                  (c.state?.inventory[id] ?? 0) > 0);
+                  (c.inventory[id] ?? 0) > 0);
               return (
                 <button
                   key={i}
@@ -280,7 +280,7 @@ export default function GatheringHUD({
                   <small>{i + 1}</small>
                   <span>{id ? itemName(id) : "—"}</span>
                   {id && c.wheel === "items" && id !== "empty" && (
-                    <b>{c.state?.inventory[id] ?? 0}</b>
+                    <b>{c.inventory[id] ?? 0}</b>
                   )}
                 </button>
               );

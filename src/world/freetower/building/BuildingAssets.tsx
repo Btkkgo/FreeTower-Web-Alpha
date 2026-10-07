@@ -1,3 +1,4 @@
+import { FarmPlotAsset } from "../life/LifeAssets";
 import * as THREE from "three";
 const wood = new THREE.MeshStandardMaterial({ color: "#8d7150", roughness: 1 }),
   stone = new THREE.MeshStandardMaterial({ color: "#9aa7a8", roughness: 1 }),
@@ -153,6 +154,7 @@ function Shelter({ material, scaffold }: BuildingAssetProps) {
 }
 const registry: Record<string, (props: BuildingAssetProps) => React.ReactNode> =
   {
+    "building.farm-plot.basic": FarmPlotAsset,
     "building.campfire.basic": Campfire,
     "building.workbench.basic": Workbench,
     "building.shelter.basic": Shelter,

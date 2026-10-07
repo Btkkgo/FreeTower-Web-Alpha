@@ -139,7 +139,7 @@ export default function BuildingHUD({
                   refresh();
                 }}
               >
-                <span className="ft-building-icon">{["♨", "⊞", "⌂"][i]}</span>
+                <span className="ft-building-icon">{["♨", "⊞", "⌂", "▤"][i]}</span>
                 <span>
                   <strong>{d.displayName}</strong>
                   <small>
@@ -190,7 +190,7 @@ export default function BuildingHUD({
           </div>
         </section>
       )}
-      {!c.active && selected && def && (
+      {!c.active && selected && def && selected.definitionId !== "farm-plot" && (
         <section
           className="ft-building-selection"
           aria-label="Selected building"

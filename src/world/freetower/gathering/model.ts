@@ -60,6 +60,7 @@ export interface ResourceNodeState {
   respawnAt: number;
 }
 export interface ResourceState {
+  life?: import("../life/types.ts").LifeState;
   buildings?: Record<string, BuildingInstance>;
   version: number;
   nodes: Record<string, ResourceNodeState>;
@@ -117,16 +118,8 @@ export const itemName = (id: string) =>
 export const itemAsset = (id: string) =>
   tools[id]?.assetId ?? items[id]?.assetId;
 export function wheelSlots(category: WheelCategory): (string | null)[] {
-  return [
-    ...(category === "tools"
-      ? ["basic-axe", "basic-pickaxe", "empty"]
-      : ["empty", "wood", "stone"]),
-    null,
-    null,
-    null,
-    null,
-    null,
-  ];
+  const slots = category === "tools" ? ["basic-axe", "basic-pickaxe", "empty", "basic-fishing-rod", "basic-hoe", "basic-watering-can"] : ["empty", "wood", "stone", "basic-bait", "wheat-seed", "carrot-seed", "chicken-feed", "water-flask"];
+  return Array.from({length:8},(_,i)=>slots[i]??null);
 }
 export function selectHandItem(
   h: HandState,
@@ -173,6 +166,9 @@ export class GatheringController {
   mode: MovementMode = "land";
   ready = false;
   suspended = false;
+  personalInventory: Record<string,number> = {};
+  useOverride: (()=>boolean)|null = null;
+  get inventory(){return {...(this.state?.inventory??{}),...this.personalInventory};}
   wheel: WheelCategory | null = null;
   highlight: number | null = null;
   action: (GatherAction & { confirmed: boolean; sent: boolean }) | null = null;
@@ -238,7 +234,7 @@ export class GatheringController {
   }
   choose(id: string) {
     if (this.suspended) return;
-    const h = selectHandItem(this.hands, id, this.state?.inventory ?? {});
+    const h = selectHandItem(this.hands, id, this.inventory);
     if (!h) {
       this.note("库存中暂无此物品");
       return;
@@ -298,6 +294,7 @@ export class GatheringController {
     this.feedback = "";
   }
   use(now = Date.now()) {
+    if (!this.suspended && this.useOverride?.()) return;
     if (this.suspended) return;
     if (!this.ready || this.wheel) return;
     if (this.action || now + this.serverOffset < this.cooldownUntil) {

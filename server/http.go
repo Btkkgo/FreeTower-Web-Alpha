@@ -18,14 +18,19 @@ import (
 )
 
 type RuntimeRoom struct {
-	buildingLocks map[string]buildingLock
-	buildingLast  map[string]int64
-	gatherUsers   map[string]*gatheringUser
-	deleted       bool
-	mu            sync.Mutex
-	record        RoomRecord
-	clients       map[*Client]bool
-	lastPersist   int64
+	buildingLocks    map[string]buildingLock
+	buildingLast     map[string]int64
+	lifeLast         map[string]int64
+	lifeReplaySync   map[*Client]int64
+	lifeReplayReply  map[*Client]int64
+	lifeNoopReceipts map[string]LifeReceipt
+	lifeNoopOrder    []string
+	gatherUsers      map[string]*gatheringUser
+	deleted          bool
+	mu               sync.Mutex
+	record           RoomRecord
+	clients          map[*Client]bool
+	lastPersist      int64
 }
 type App struct {
 	store      *Store
@@ -50,6 +55,9 @@ func newApp(store *Store, staticDir string) (*App, error) {
 		r.Room.OnlineCount = 0
 		rr := &RuntimeRoom{record: r, clients: map[*Client]bool{}}
 		if err := rr.advanceBuildings(nowMS(), true, nil, func(record RoomRecord) error { return store.saveRoom(ctx, record) }); err != nil {
+			return nil, err
+		}
+		if err := rr.advanceLife(nowMS(), true, nil, func(record RoomRecord) error { return store.saveRoom(ctx, record) }); err != nil {
 			return nil, err
 		}
 		a.rooms[r.Room.ID] = rr
@@ -454,6 +462,9 @@ func (a *App) runTicker() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				if err := rr.advanceBuildings(at, false, nil, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
 					log.Printf("building timer save failed: %v", err)
+				}
+				if err := rr.advanceLife(at, false, nil, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
+					log.Printf("life timer save failed: %v", err)
 				}
 				if err := rr.respawnGathering(at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
 					log.Printf("resource respawn save failed: %v", err)

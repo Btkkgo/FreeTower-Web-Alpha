@@ -1,0 +1,119 @@
+{
+  "interactionRange": 3.5,
+  "starterItems": {
+    "wheat-seed": 5,
+    "carrot-seed": 5,
+    "chicken-feed": 5,
+    "carrot": 3,
+    "water-flask": 5,
+    "basic-bait": 20
+  },
+  "survival": {
+    "hungerDecay": 0.6,
+    "thirstDecay": 0.8,
+    "energyRegeneration": 2
+  },
+  "fishing": {
+    "minRange": 2,
+    "maxRange": 12,
+    "facingConeDegrees": 100,
+    "initialDistance": 12,
+    "reelSpeed": 2.4,
+    "tensionGain": 18,
+    "tensionRelax": 24,
+    "maxTension": 100,
+    "expirySeconds": 60
+  },
+  "spots": [
+    {
+      "id": "silver-river",
+      "habitat": "river"
+    },
+    {
+      "id": "ancient-sea",
+      "habitat": "coast"
+    }
+  ],
+  "fish": [
+    {
+      "id": "river-minnow",
+      "assetId": "fish.river-minnow",
+      "habitat": "river",
+      "rarity": 1,
+      "biteDelayRange": [
+        3,
+        6
+      ],
+      "fightStrength": 1,
+      "baseValue": 1,
+      "displayName": "River Minnow"
+    },
+    {
+      "id": "river-carp",
+      "assetId": "fish.river-carp",
+      "habitat": "river",
+      "rarity": 3,
+      "biteDelayRange": [
+        4,
+        8
+      ],
+      "fightStrength": 1.2,
+      "baseValue": 3,
+      "displayName": "River Carp"
+    },
+    {
+      "id": "coast-mackerel",
+      "assetId": "fish.coast-mackerel",
+      "habitat": "coast",
+      "rarity": 1,
+      "biteDelayRange": [
+        3,
+        7
+      ],
+      "fightStrength": 1.1,
+      "baseValue": 2,
+      "displayName": "Coast Mackerel"
+    },
+    {
+      "id": "coast-snapper",
+      "assetId": "fish.coast-snapper",
+      "habitat": "coast",
+      "rarity": 3,
+      "biteDelayRange": [
+        5,
+        9
+      ],
+      "fightStrength": 1.3,
+      "baseValue": 4,
+      "displayName": "Coast Snapper"
+    }
+  ],
+  "crops": [
+    {
+      "id": "wheat",
+      "seedId": "wheat-seed",
+      "growthSeconds": 45,
+      "harvestQuantity": 3,
+      "displayName": "Wheat",
+      "assetId": "crop.wheat"
+    },
+    {
+      "id": "carrot",
+      "seedId": "carrot-seed",
+      "growthSeconds": 60,
+      "harvestQuantity": 3,
+      "displayName": "Carrot",
+      "assetId": "crop.carrot"
+    }
+  ],
+  "animals": {
+    "count": 4,
+    "center": {
+      "x": 0,
+      "z": 18
+    },
+    "habitatRadius": 7,
+    "speed": 0.7,
+    "eggSeconds": 35
+  }
+}

@@ -115,6 +115,15 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	rr.tick(nowMS())
 	rr.clients[c] = true
 	if c.player.World == "freetower" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := rr.joinLife(c, nowMS(), func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
+			delete(rr.clients, c)
+			rr.mu.Unlock()
+			c.close()
+			cancel()
+			return
+		}
+		cancel()
 		rr.gatheringUser(c)
 		rr.syncGatherUser(c.user.ID)
 	}
@@ -129,7 +138,10 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	_ = rr.advanceBuildings(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
 	cancel()
+	_ = rr.advanceLife(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(context.Background(), record) })
 	delete(rr.clients, c)
+	delete(rr.lifeReplaySync, c)
+	delete(rr.lifeReplayReply, c)
 	rr.broadcastPresence()
 	rr.mu.Unlock()
 	c.close()
@@ -187,6 +199,42 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			continue
 		}
 		switch msg.Type {
+		case "life-action":
+			var q LifeRequest
+			if json.Unmarshal(b, &q) != nil {
+				continue
+			}
+			rr.mu.Lock()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			at := nowMS()
+			replay := false
+			if rr.record.State.FreeTower != nil {
+				_, replay = rr.record.State.FreeTower.LifeReceipts[q.RequestID]
+			}
+			if _, ok := rr.lifeNoopReceipts[q.RequestID]; ok {
+				replay = true
+			}
+			failure := rr.lifeCommand(c, q, at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
+			cancel()
+			if replay && failure == nil && !rr.lifeReplayReplyAllowed(c, at) {
+				rr.mu.Unlock()
+				continue
+			}
+			payload := map[string]any{"type": "life-result", "requestId": q.RequestID, "message": "Life action completed"}
+			if failure != nil {
+				code := "invalid"
+				if e, ok := failure.(*gatherError); ok {
+					code = e.Code
+				}
+				payload = map[string]any{"type": "life-error", "requestId": q.RequestID, "code": code, "message": failure.Error()}
+			}
+			raw, _ := json.Marshal(payload)
+			select {
+			case c.send <- raw:
+			default:
+				c.close()
+			}
+			rr.mu.Unlock()
 		case "place-building", "begin-building-move", "move-building", "cancel-building-move", "renew-building-move":
 			var q BuildingRequest
 			if json.Unmarshal(b, &q) != nil {

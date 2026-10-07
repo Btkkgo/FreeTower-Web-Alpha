@@ -1,3 +1,4 @@
+import LifeHUD, { useLife } from "./life/LifeHUD";
 import BuildingHUD, { useBuilding } from "./building/BuildingHUD";
 import {
   useCallback,
@@ -47,20 +48,29 @@ export default function FreeTowerApp() {
     debug = new URLSearchParams(location.search).get("debug") === "1";
   const gathering = useGathering(
     (message) => {
-      if (ws.current?.readyState === WebSocket.OPEN)
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        life.networkOut++;
         ws.current.send(JSON.stringify(message));
+      }
     },
     connected,
     detail?.room.id,
   );
   const building = useBuilding(
     (message) => {
-      if (ws.current?.readyState === WebSocket.OPEN)
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        life.networkOut++;
         ws.current.send(JSON.stringify(message));
+      }
     },
     connected,
     detail?.room.id,
   );
+  const life = useLife((message) => {
+    if(ws.current?.readyState === WebSocket.OPEN) {life.networkOut++;ws.current.send(JSON.stringify(message));}
+  }, connected, detail?.room.id);
+  life.selfId = user?.id ?? "";
+  gathering.personalInventory = life.personal?.inventory ?? {};
   building.selfId = user?.id ?? "";
   building.players = players.filter((p) => p.world === "freetower");
   const serverOffset = useRef(0);
@@ -68,6 +78,7 @@ export default function FreeTowerApp() {
     if (detail?.state.freeTower) {
       gathering.applyState(detail.state.freeTower);
       building.applyState(detail.state.freeTower);
+      life.applyState(detail.state.freeTower);
     }
   }, [detail?.state.freeTower, gathering]);
   useEffect(() => {
@@ -141,7 +152,11 @@ export default function FreeTowerApp() {
         } catch {
           return;
         }
-        if (msg.type === "presence") {
+        life.networkIn++;
+        if(msg.type === "life-self" || msg.type === "life-result" || msg.type === "life-error") {
+          life.handle(msg);
+          gathering.personalInventory = life.personal?.inventory ?? {};
+        } else if (msg.type === "presence") {
           setPlayers(msg.players);
           const self = msg.players.find(
             (p) => p.id === user.id && p.world === "freetower",
@@ -193,6 +208,7 @@ export default function FreeTowerApp() {
           serverOffset.current = msg.serverTime - Date.now();
           gathering.serverOffset = serverOffset.current;
           building.serverOffset = serverOffset.current;
+          life.serverOffset = serverOffset.current;
           setDetail((d) =>
             d &&
             d.room.id === roomId &&
@@ -233,7 +249,7 @@ export default function FreeTowerApp() {
   }, [detail?.room.id, user?.id]);
   const sendMove = useCallback((m: ReturnType<typeof movePayload>) => {
     if (ws.current?.readyState === WebSocket.OPEN)
-      ws.current.send(JSON.stringify(m));
+      { life.networkOut++; ws.current.send(JSON.stringify(m)); }
   }, []);
   const submitAuth = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -253,6 +269,7 @@ export default function FreeTowerApp() {
     const f = e.currentTarget,
       input = f.elements.namedItem("text") as HTMLInputElement;
     if (input.value.trim() && ws.current?.readyState === WebSocket.OPEN) {
+      life.networkOut++;
       ws.current.send(
         JSON.stringify({ type: "chat", text: input.value.trim() }),
       );
@@ -263,6 +280,7 @@ export default function FreeTowerApp() {
     <main className="ft-app">
       <div className="ft-world">
         <FreeTowerWorld
+          life={life}
           building={building}
           gathering={gathering}
           players={players}
@@ -276,6 +294,7 @@ export default function FreeTowerApp() {
       </div>
       {detail ? (
         <>
+          <LifeHUD controller={life} gathering={gathering} building={building} debug={debug}/>
           <GatheringHUD controller={gathering} debug={debug} />
           <BuildingHUD
             controller={building}

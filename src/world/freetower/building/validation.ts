@@ -163,7 +163,7 @@ export function blocksMovement(p: Point, buildings: BuildingInstance[], old?: Po
     const q = at(i), previous = at(i - 1);
     for (const b of buildings) {
       const d = buildingDefinitions[b.definitionId];
-      if (!d || (b.status !== "completed" && b.status !== "moving")) continue;
+      if (b.definitionId === "farm-plot" || !d || (b.status !== "completed" && b.status !== "moving")) continue;
       const overlaps = (point: Point) => circleOverlap(b.position, b.rotationY, d.footprint, point, buildingConfig.playerRadius);
       if (!overlaps(q)) continue;
       if (old && overlaps(previous) && buildingPenetration(q, b.position, b.rotationY, d.footprint, buildingConfig.playerRadius) < buildingPenetration(previous, b.position, b.rotationY, d.footprint, buildingConfig.playerRadius) - 1e-9) continue;

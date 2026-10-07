@@ -1,3 +1,5 @@
+import type {LifeController} from "./life/controller";
+import {activeFishing} from "./fishing/model";
 import { useRef, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
@@ -18,12 +20,14 @@ export default function Explorer({
   name,
   color,
   gathering,
+  life,
 }: {
   motion?: MutableRefObject<Motion>;
   remote?: Player;
   name: string;
   color: string;
   gathering?: GatheringController;
+  life?: LifeController;
 }) {
   const root = useRef<THREE.Group>(null),
     body = useRef<THREE.Group>(null),
@@ -92,6 +96,11 @@ export default function Explorer({
         progress < 0.43
           ? -2.2 * (progress / 0.43)
           : -2.2 + 3.2 * Math.sin(((progress - 0.43) / 0.57) * Math.PI);
+    }
+    const fishing = life?.state.fishing[remote?.id ?? life.selfId];
+    if(!swim && activeFishing(fishing)) {
+      const arm=hands?.active === "left" ? left : right;
+      arm.current!.rotation.x = fishing?.state === "casting" ? -.9 : -.55;
     }
     if (heldL.current) heldL.current.visible = !swim;
     if (heldR.current) heldR.current.visible = !swim;

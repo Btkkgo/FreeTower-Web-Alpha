@@ -70,6 +70,9 @@ func (rr *RuntimeRoom) buildingCommand(c *Client, kind string, q BuildingRequest
 		rr.buildingLocks = map[string]buildingLock{}
 	}
 	f := rr.record.State.FreeTower
+	if f.Life != nil && liveFishing(f.Life.Fishing[c.user.ID]) {
+		return result, gatherErr("busy", "Finish fishing first")
+	}
 	b := f.Buildings[q.BuildingID]
 	durable := kind == "place-building" || kind == "move-building" || kind == "begin-building-move"
 	raw, _ := json.Marshal(struct {
@@ -234,6 +237,8 @@ func publicState(s FarmState) FarmState {
 	}
 	f := *s.FreeTower
 	f.BuildingReceipts = nil
+	f.Personal = nil
+	f.LifeReceipts = nil
 	s.FreeTower = &f
 	return s
 }

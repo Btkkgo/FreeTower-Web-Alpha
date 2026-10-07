@@ -211,7 +211,7 @@ func buildingMovement(f *FreeTowerState, old, p Vec2) Vec2 {
 		q := Vec2{old.X + (p.X-old.X)*float64(i)/float64(steps), old.Z + (p.Z-old.Z)*float64(i)/float64(steps)}
 		for _, b := range f.Buildings {
 			d := buildingDefinition(b.DefinitionID)
-			if d != nil && (b.Status == "completed" || b.Status == "moving") && buildingCircle(Vec2{b.Position.X, b.Position.Z}, b.RotationY, d, q, buildingConfig.PlayerRadius) {
+			if b.DefinitionID != "farm-plot" && d != nil && (b.Status == "completed" || b.Status == "moving") && buildingCircle(Vec2{b.Position.X, b.Position.Z}, b.RotationY, d, q, buildingConfig.PlayerRadius) {
 				previous := Vec2{old.X + (p.X-old.X)*float64(i-1)/float64(steps), old.Z + (p.Z-old.Z)*float64(i-1)/float64(steps)}
 				center := Vec2{b.Position.X, b.Position.Z}
 				if buildingCircle(center, b.RotationY, d, previous, buildingConfig.PlayerRadius) {

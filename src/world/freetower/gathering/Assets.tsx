@@ -1,3 +1,4 @@
+import { LifeAsset, hasLifeAsset } from "../life/LifeAssets";
 import * as THREE from "three";
 import type { AssetId } from "./model";
 const wood = new THREE.MeshStandardMaterial({ color: "#826043", roughness: 1 }),
@@ -100,6 +101,7 @@ const assetRegistry: Record<AssetId, () => React.ReactNode> = {
   "item.stone.basic": Stone,
 };
 export function Asset({ id }: { id?: AssetId }) {
+  if(id && hasLifeAsset(id)) return <LifeAsset id={id}/>;
   const Component = id ? assetRegistry[id] : undefined;
   return Component ? (
     <group dispose={null}>

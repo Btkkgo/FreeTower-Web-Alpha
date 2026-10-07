@@ -27,6 +27,36 @@
         "rock"
       ],
       "handUsage": "one"
+    },
+    {
+      "id": "basic-fishing-rod",
+      "type": "fishing-rod",
+      "displayName": "Basic Fishing Rod",
+      "assetId": "tool.fishing-rod.basic",
+      "gatherPower": 0,
+      "cooldown": 600,
+      "validResourceTypes": [],
+      "handUsage": "one"
+    },
+    {
+      "id": "basic-hoe",
+      "type": "hoe",
+      "displayName": "Basic Hoe",
+      "assetId": "tool.hoe.basic",
+      "gatherPower": 0,
+      "cooldown": 600,
+      "validResourceTypes": [],
+      "handUsage": "one"
+    },
+    {
+      "id": "basic-watering-can",
+      "type": "watering-can",
+      "displayName": "Basic Watering Can",
+      "assetId": "tool.watering-can.basic",
+      "gatherPower": 0,
+      "cooldown": 600,
+      "validResourceTypes": [],
+      "handUsage": "one"
     }
   ],
   "items": [
@@ -41,6 +71,78 @@
       "displayName": "Stone",
       "assetId": "item.stone.basic",
       "category": "resource"
+    },
+    {
+      "id": "basic-bait",
+      "displayName": "Basic Bait",
+      "assetId": "item.basic-bait.basic",
+      "category": "bait"
+    },
+    {
+      "id": "wheat-seed",
+      "displayName": "Wheat Seed",
+      "assetId": "item.wheat-seed.basic",
+      "category": "seed"
+    },
+    {
+      "id": "carrot-seed",
+      "displayName": "Carrot Seed",
+      "assetId": "item.carrot-seed.basic",
+      "category": "seed"
+    },
+    {
+      "id": "chicken-feed",
+      "displayName": "Chicken Feed",
+      "assetId": "item.chicken-feed.basic",
+      "category": "feed"
+    },
+    {
+      "id": "carrot",
+      "displayName": "Carrot",
+      "assetId": "item.carrot.basic",
+      "category": "food"
+    },
+    {
+      "id": "wheat",
+      "displayName": "Wheat",
+      "assetId": "item.wheat.basic",
+      "category": "food"
+    },
+    {
+      "id": "water-flask",
+      "displayName": "Water Flask",
+      "assetId": "item.water-flask.basic",
+      "category": "drink"
+    },
+    {
+      "id": "egg",
+      "displayName": "Egg",
+      "assetId": "item.egg.basic",
+      "category": "food"
+    },
+    {
+      "id": "river-minnow",
+      "displayName": "River Minnow",
+      "assetId": "fish.river-minnow",
+      "category": "raw-fish"
+    },
+    {
+      "id": "river-carp",
+      "displayName": "River Carp",
+      "assetId": "fish.river-carp",
+      "category": "raw-fish"
+    },
+    {
+      "id": "coast-mackerel",
+      "displayName": "Coastal Mackerel",
+      "assetId": "fish.coast-mackerel",
+      "category": "raw-fish"
+    },
+    {
+      "id": "coast-snapper",
+      "displayName": "Coastal Snapper",
+      "assetId": "fish.coast-snapper",
+      "category": "raw-fish"
     }
   ],
   "definitions": [
