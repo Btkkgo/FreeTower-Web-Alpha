@@ -129,6 +129,11 @@ export interface RoomDetail {
   serverTime: number;
 }
 export interface Player {
+  world?: string;
+  movementMode?: "land" | "shallow-water" | "swimming";
+  moving?: boolean;
+  running?: boolean;
+  elevation?: number;
   avatar: AvatarAppearance;
   id: string;
   username: string;
@@ -160,7 +165,7 @@ export interface ActionResult {
   serverTime: number;
 }
 export type ClientMessage =
-  | { type: "move"; position: Vec2; facing: number; jump?: boolean }
+  | { type: "move"; position: Vec2; facing: number; jump?: boolean; movementMode?: "land" | "shallow-water" | "swimming"; moving?: boolean; running?: boolean }
   | { type: "whistle" }
   | { type: "chat"; text: string };
 export type ServerMessage =

@@ -337,7 +337,7 @@ func (rr *RuntimeRoom) tick(at int64) {
 
 func (rr *RuntimeRoom) playerPosition(userID string) *Vec2 {
 	for c := range rr.clients {
-		if c.user.ID == userID {
+		if c.user.ID == userID && c.player.World == "" {
 			position := c.player.Position
 			return &position
 		}

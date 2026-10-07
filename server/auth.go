@@ -213,7 +213,7 @@ func (a *App) updateProfile(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if changed {
-			rr.broadcast(map[string]any{"type": "presence", "players": rr.players()})
+			rr.broadcastPresence()
 		}
 		rr.mu.Unlock()
 	}

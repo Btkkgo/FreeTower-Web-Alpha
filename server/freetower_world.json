@@ -1,0 +1,23 @@
+{
+  "size": 150,
+  "bound": 73,
+  "spawn": { "x": 0, "z": 18 },
+  "waterLevel": 0,
+  "tower": { "x": 16, "z": 340, "height": 72 },
+  "river": {
+    "center": -4,
+    "amplitude": 4,
+    "frequency": 0.06,
+    "halfWidth": 4,
+    "depth": 2.4
+  },
+  "ocean": { "shore": 40, "slopeStart": 34, "slopeEnd": 42, "slope": 0.32 },
+  "movement": {
+    "walk": 4.6,
+    "run": 7.4,
+    "wade": 3.2,
+    "swim": 2.8,
+    "swimDepth": 1.1,
+    "floatOffset": 0.35
+  }
+}

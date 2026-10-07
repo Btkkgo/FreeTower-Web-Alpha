@@ -194,13 +194,18 @@ type Action struct {
 	UpgradeID     string `json:"upgradeId,omitempty"`
 }
 type Player struct {
-	Avatar   AvatarAppearance `json:"avatar"`
-	ID       string           `json:"id"`
-	Username string           `json:"username"`
-	Position Vec2             `json:"position"`
-	Facing   float64          `json:"facing"`
-	Color    string           `json:"color"`
-	JumpAt   int64            `json:"jumpAt,omitempty"`
+	World        string           `json:"world,omitempty"`
+	MovementMode string           `json:"movementMode,omitempty"`
+	Moving       bool             `json:"moving,omitempty"`
+	Running      bool             `json:"running,omitempty"`
+	Elevation    float64          `json:"elevation,omitempty"`
+	Avatar       AvatarAppearance `json:"avatar"`
+	ID           string           `json:"id"`
+	Username     string           `json:"username"`
+	Position     Vec2             `json:"position"`
+	Facing       float64          `json:"facing"`
+	Color        string           `json:"color"`
+	JumpAt       int64            `json:"jumpAt,omitempty"`
 }
 
 func nowMS() int64 { return time.Now().UnixMilli() }

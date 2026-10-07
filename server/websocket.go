@@ -47,6 +47,34 @@ func (rr *RuntimeRoom) players() []Player {
 	return out
 }
 
+// Membership and chat stay shared; coordinate spaces are separate presentations.
+func (rr *RuntimeRoom) playersInWorld(world string) []Player {
+	out := []Player{}
+	seen := map[string]bool{}
+	for c := range rr.clients {
+		if c.player.World == world && !seen[c.user.ID] {
+			out = append(out, c.player)
+			seen[c.user.ID] = true
+		}
+	}
+	return out
+}
+func (rr *RuntimeRoom) broadcastPresence() {
+	payloads := map[string][]byte{}
+	for c := range rr.clients {
+		b, ok := payloads[c.player.World]
+		if !ok {
+			b, _ = json.Marshal(map[string]any{"type": "presence", "players": rr.playersInWorld(c.player.World)})
+			payloads[c.player.World] = b
+		}
+		select {
+		case c.send <- b:
+		default:
+			c.close()
+		}
+	}
+}
+
 var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 4096, CheckOrigin: sameOrigin}
 
 func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
@@ -76,9 +104,14 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	}
 	colors := []string{"#de9479", "#89b7a1", "#aca1cc", "#d4b575", "#87aec8"}
 	c := &Client{conn: conn, user: u, player: Player{ID: u.ID, Username: u.Username, Avatar: u.Avatar, Position: Vec2{1, 7}, Color: colors[len(rr.clients)%len(colors)]}, send: make(chan []byte, 64), done: make(chan struct{})}
+	if r.URL.Query().Get("world") == "freetower" {
+		c.player.World = "freetower"
+		c.player.Position = freeTowerConfig.Spawn
+		c.player.MovementMode, c.player.Elevation = freeTowerLocomotion(c.player.Position)
+	}
 	rr.tick(nowMS())
 	rr.clients[c] = true
-	rr.broadcast(map[string]any{"type": "presence", "players": rr.players()})
+	rr.broadcastPresence()
 	b, _ := json.Marshal(map[string]any{"type": "state", "state": rr.record.State, "serverTime": nowMS()})
 	c.send <- b
 	rr.mu.Unlock()
@@ -87,7 +120,7 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	rr.mu.Lock()
 	rr.tick(nowMS())
 	delete(rr.clients, c)
-	rr.broadcast(map[string]any{"type": "presence", "players": rr.players()})
+	rr.broadcastPresence()
 	rr.mu.Unlock()
 	c.close()
 }
@@ -132,6 +165,8 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			Position Vec2    `json:"position"`
 			Facing   float64 `json:"facing"`
 			Jump     bool    `json:"jump"`
+			Moving   bool    `json:"moving"`
+			Running  bool    `json:"running"`
 			Text     string  `json:"text"`
 		}
 		if json.Unmarshal(b, &msg) != nil {
@@ -151,18 +186,29 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			dx := msg.Position.X - c.player.Position.X
 			dz := msg.Position.Z - c.player.Position.Z
 			distance := math.Hypot(dx, dz)
-			limit := math.Min(dt, 2)*14 + 1
+			speed := 14.0
+			if c.player.World == "freetower" {
+				speed = freeTowerConfig.Movement.Run
+			}
+			limit := math.Min(dt, 2)*speed + 1
 			if distance > limit {
 				msg.Position.X = c.player.Position.X + dx/distance*limit
 				msg.Position.Z = c.player.Position.Z + dz/distance*limit
 			}
 			rr.tick(now.UnixMilli())
-			c.player.Position = allowedPosition(&rr.record.State, msg.Position, c.player.Position)
+			if c.player.World == "freetower" {
+				c.player.Position = freeTowerPosition(msg.Position)
+				c.player.MovementMode, c.player.Elevation = freeTowerLocomotion(c.player.Position)
+				c.player.Moving = msg.Moving
+				c.player.Running = msg.Running && c.player.MovementMode == "land"
+			} else {
+				c.player.Position = allowedPosition(&rr.record.State, msg.Position, c.player.Position)
+			}
 			c.player.Facing = msg.Facing
-			if msg.Jump && now.UnixMilli()-c.player.JumpAt >= 650 {
+			if msg.Jump && c.player.MovementMode != "swimming" && now.UnixMilli()-c.player.JumpAt >= 650 {
 				c.player.JumpAt = now.UnixMilli()
 			}
-			rr.broadcast(map[string]any{"type": "presence", "players": rr.players()})
+			rr.broadcastPresence()
 			rr.mu.Unlock()
 			lastMove = now
 		case "chat":

@@ -1,0 +1,364 @@
+.ft-app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #8fc9dc;
+  color: #eaf3ed;
+  font-family: Inter, "PingFang SC", system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+.ft-app * {
+  box-sizing: border-box;
+}
+.ft-world {
+  position: absolute;
+  inset: 0;
+}
+.ft-app button,
+.ft-app input {
+  font: inherit;
+  color: inherit;
+  border: 1px solid #a7c2b53b;
+  border-radius: 5px;
+  background: #11272dbf;
+  box-shadow: none;
+}
+.ft-app button {
+  padding: 9px 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.ft-app button:hover {
+  background: #365057ed;
+  border-color: #d2bd85;
+}
+.ft-app button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.ft-app input {
+  padding: 11px;
+  min-width: 0;
+  outline: none;
+}
+.ft-app input:focus {
+  border-color: #d2bd85;
+}
+.ft-app input::placeholder {
+  color: #cad8d4a6;
+}
+.ft-heading {
+  position: absolute;
+  left: 28px;
+  top: 24px;
+  text-shadow: 0 2px 8px #183126b0;
+  pointer-events: none;
+}
+.ft-wordmark {
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 0.17em;
+}
+.ft-wordmark > span:last-child {
+  font-weight: 700;
+}
+.ft-sigil {
+  color: #e3d4a3;
+  margin-right: 12px;
+  font-size: 30px;
+}
+.ft-heading p {
+  margin: 4px 0 0 43px;
+  font-size: 12px;
+  color: #ebf3df;
+}
+.ft-topright {
+  position: absolute;
+  right: 25px;
+  top: 27px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.ft-online {
+  background: #142d36b3;
+  padding: 10px 14px;
+  border-radius: 5px;
+  backdrop-filter: blur(12px);
+}
+.ft-online i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9bd9c4;
+  margin-right: 8px;
+}
+.ft-online i.offline {
+  background: #d6a860;
+}
+.ft-compass {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-shadow: 0 1px 5px #234;
+}
+.ft-compass span {
+  margin: 0 12px;
+  color: #d7c595;
+}
+.ft-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #f0f5ec;
+  background: #18333cb0;
+  padding: 10px 17px;
+  border-radius: 5px;
+  pointer-events: none;
+}
+.ft-controls kbd {
+  font: inherit;
+  color: #e6d29b;
+  margin-right: 4px;
+}
+.ft-chat {
+  position: absolute;
+  left: 25px;
+  bottom: 62px;
+  width: 280px;
+  max-width: 30vw;
+}
+.ft-chat-log {
+  background: linear-gradient(90deg, #142a338c, transparent);
+  border-radius: 5px;
+}
+.ft-chat-log p {
+  font-size: 11px;
+  line-height: 1.7;
+  padding: 3px 10px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px #123;
+}
+.ft-chat-log b {
+  color: #e6d39c;
+  font-weight: 500;
+}
+.ft-chat form {
+  display: flex;
+  margin-top: 7px;
+  opacity: 0.85;
+}
+.ft-chat input {
+  width: 100%;
+  font-size: 11px;
+}
+.ft-chat button {
+  padding: 6px 10px;
+}
+.ft-water-state {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  color: #caf3f1;
+  background: #15323dcc;
+  padding: 9px 20px;
+  border: 1px solid #9fdfd24d;
+  border-radius: 30px;
+}
+.ft-settings {
+  position: absolute;
+  right: 25px;
+  top: 80px;
+  width: 280px;
+  background: #142c35eb;
+  border: 1px solid #a8c7c544;
+  border-radius: 7px;
+  padding: 22px;
+  backdrop-filter: blur(15px);
+}
+.ft-settings h2 {
+  font-size: 17px;
+  margin-top: 0;
+}
+.ft-settings p {
+  line-height: 1.8;
+  color: #bececd;
+}
+.ft-settings strong {
+  color: #e8cf91;
+}
+.ft-settings a {
+  display: block;
+  color: #9cb9b9;
+  font-size: 11px;
+  margin-top: 17px;
+}
+.ft-debug {
+  position: absolute;
+  right: 25px;
+  bottom: 68px;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  background: #071d24cc;
+  color: #d7f0da;
+  padding: 10px 14px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.ft-name {
+  white-space: nowrap;
+  font-size: 10px;
+  color: #e5eddf;
+  background: #1a343ba8;
+  border-radius: 3px;
+  padding: 3px 7px;
+  pointer-events: none;
+}
+.ft-entry {
+  position: absolute;
+  left: 8vw;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 360px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 30px;
+  background: linear-gradient(135deg, #132c39ef, #183938c9);
+  border: 1px solid #a4bfaa4d;
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 24px 100px #12282b3b;
+}
+.ft-entry-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  color: #d5c38f;
+}
+.ft-entry h1 {
+  font-size: 36px;
+  letter-spacing: 0.1em;
+  font-weight: 300;
+  margin: 15px 0 8px;
+}
+.ft-entry h1 span {
+  font-weight: 650;
+}
+.ft-intro {
+  color: #bad0ce;
+  margin: 0 0 28px;
+  font-size: 12px;
+}
+.ft-entry h2 {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 18px;
+}
+.ft-entry label {
+  display: block;
+  font-size: 11px;
+  color: #c7d6cf;
+  margin-top: 12px;
+}
+.ft-entry label input {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+}
+.ft-entry .ft-primary {
+  margin-top: 20px;
+  width: 100%;
+  background: #d5c292;
+  color: #20323b;
+  border: 0;
+  font-weight: 600;
+}
+.ft-entry .ft-link {
+  display: block;
+  background: none;
+  border: 0;
+  color: #b6caca;
+  font-size: 11px;
+  margin: 8px auto 0;
+}
+.ft-room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+}
+.ft-room-list button {
+  text-align: left;
+}
+.ft-room-list small {
+  display: block;
+  color: #b0c2bd;
+  font-size: 10px;
+  margin-top: 7px;
+}
+.ft-lobby form {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.ft-lobby input {
+  width: 100%;
+  font-size: 11px;
+}
+.ft-lobby form button {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.ft-error {
+  position: absolute;
+  left: 50%;
+  top: 100px;
+  transform: translateX(-50%);
+  background: #663f36ef;
+  padding: 14px 20px;
+  border-radius: 6px;
+  max-width: 90vw;
+}
+.ft-error button {
+  margin-left: 16px;
+  padding: 2px 7px;
+}
+@media (max-width: 800px) {
+  .ft-compass {
+    display: none;
+  }
+  .ft-controls {
+    gap: 8px;
+    font-size: 8px;
+    max-width: 96vw;
+  }
+  .ft-chat {
+    max-width: 42vw;
+  }
+  .ft-entry {
+    left: 5vw;
+    width: 330px;
+  }
+  .ft-heading {
+    left: 18px;
+  }
+  .ft-wordmark {
+    font-size: 20px;
+  }
+  .ft-topright {
+    right: 15px;
+  }
+}
