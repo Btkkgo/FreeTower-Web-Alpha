@@ -133,7 +133,7 @@ func (h *identityHarness) fixtureProviders() *identityFixture {
 func (h *identityHarness) selectIdentity(status int) CharacterIdentity {
 	h.t.Helper()
 	var v struct{ Identity CharacterIdentity }
-	h.call("POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.btc"}, status, &v)
+	h.call("POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.fb"}, status, &v)
 	return v.Identity
 }
 
@@ -183,9 +183,9 @@ func (p *fixtureNames) ReverseLookup(context.Context, string) ([]BtcNameRecord, 
 		return nil, errProvider
 	}
 	result := []BtcNameRecord{}
-	for _, name := range []string{"alice.btc", "second.btc"}[:f.names] {
+	for _, name := range []string{"alice.fb", "second.fb"}[:f.names] {
 		if f.reverseMismatch {
-			name = "mismatch.btc"
+			name = "mismatch.fb"
 		}
 		owner := f.address
 		if f.wrongOwner {
@@ -354,14 +354,14 @@ func TestIdentityOptionsSelectionAndPrivacy(t *testing.T) {
 		t.Fatal("multiple choices lost")
 	}
 	id := h.selectIdentity(200)
-	if id.ID == "" || id.BtcName != "alice.btc" || id.LastVerifiedAt == 0 {
+	if id.ID == "" || id.BtcName != "alice.fb" || id.LastVerifiedAt == 0 {
 		t.Fatal("identity not created")
 	}
 	h.call("GET", "/api/rooms", nil, 200, nil)
-	h.call("POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.btc", "username": "custom"}, 400, nil)
+	h.call("POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.fb", "username": "custom"}, 400, nil)
 	var me struct{ User User }
 	h.call("GET", "/api/identity/me", nil, 200, &me)
-	if me.User.ID != id.ID || me.User.Username != "alice.btc" || me.User.CharacterAssetID != "asset-1" {
+	if me.User.ID != id.ID || me.User.Username != "alice.fb" || me.User.CharacterAssetID != "asset-1" {
 		t.Fatal("display identity mismatch")
 	}
 	public, _ := json.Marshal(Player{ID: me.User.ID, Username: me.User.Username, CharacterIdentityID: id.ID, BtcName: id.BtcName, CharacterAssetID: id.CharacterAssetID})
@@ -380,7 +380,7 @@ func TestIdentityOptionsSelectionAndPrivacy(t *testing.T) {
 	}
 	defer reopened.close()
 	d, e := reopened.identityState(context.Background(), nil)
-	if e != nil || d.Identities[id.ID].BtcName != "alice.btc" || len(d.Wallets) != 1 {
+	if e != nil || d.Identities[id.ID].BtcName != "alice.fb" || len(d.Wallets) != 1 {
 		t.Fatal("identity persistence failed")
 	}
 }
@@ -446,7 +446,7 @@ func TestIdentityLogoutDuringSelection(t *testing.T) {
 	f.started = make(chan struct{})
 	finished := make(chan int, 1)
 	go func() {
-		status, _ := h.request(h.client, "POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.btc"}, h.server.URL)
+		status, _ := h.request(h.client, "POST", "/api/identity/select", map[string]string{"characterAssetId": "asset-1", "btcName": "alice.fb"}, h.server.URL)
 		finished <- status
 	}()
 	<-f.started
@@ -515,7 +515,7 @@ func TestIdentityLegacyAndDevSessionsCannotBypassProduction(t *testing.T) {
 		Names  []BtcNameRecord
 	}
 	h.call("GET", "/api/identity/options", nil, 200, &choices)
-	if len(choices.Assets) != 2 || choices.Names[0].Name != "alice.btc" {
+	if len(choices.Assets) != 2 || choices.Names[0].Name != "alice.fb" {
 		t.Fatal("DEV fixture choices")
 	}
 	h.call("POST", "/api/identity/select", map[string]string{"characterAssetId": choices.Assets[0].AssetID, "btcName": choices.Names[0].Name}, 200, nil)
@@ -564,13 +564,13 @@ func TestIdentityMultiplayerChatCarriesNameWithoutWallet(t *testing.T) {
 		var msg map[string]json.RawMessage
 		json.Unmarshal(raw, &msg)
 		if string(msg["type"]) == `"presence"` {
-			if !bytes.Contains(raw, []byte(`"btcName":"alice.btc"`)) {
+			if !bytes.Contains(raw, []byte(`"btcName":"alice.fb"`)) {
 				t.Fatal("presence lacks domain")
 			}
 			presence = true
 		}
 		if string(msg["type"]) == `"chat"` {
-			if string(msg["btcName"]) != `"alice.btc"` || string(msg["characterIdentityId"]) != `"`+identity.ID+`"` {
+			if string(msg["btcName"]) != `"alice.fb"` || string(msg["characterIdentityId"]) != `"`+identity.ID+`"` {
 				t.Fatal("chat identity spoofed")
 			}
 			chat = true

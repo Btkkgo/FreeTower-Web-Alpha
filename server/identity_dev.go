@@ -26,11 +26,11 @@ func (devNameResolver) ReverseLookup(_ context.Context, address string) ([]BtcNa
 	if address == "dev:bob" {
 		persona = "bob"
 	}
-	return []BtcNameRecord{{Name: persona + ".btc", Owner: address, Provider: "dev", Network: "synthetic"}, {Name: persona + "-two.btc", Owner: address, Provider: "dev", Network: "synthetic"}}, nil
+	return []BtcNameRecord{{Name: persona + ".fb", Owner: address, Provider: "dev", Network: "synthetic"}, {Name: persona + "-two.fb", Owner: address, Provider: "dev", Network: "synthetic"}}, nil
 }
 func (devNameResolver) Resolve(_ context.Context, name string) (*BtcNameRecord, error) {
 	for _, a := range []string{"alice", "bob"} {
-		for _, n := range []string{a + ".btc", a + "-two.btc"} {
+		for _, n := range []string{a + ".fb", a + "-two.fb"} {
 			if name == n {
 				return &BtcNameRecord{Name: name, Owner: "dev:" + a, Provider: "dev", Network: "synthetic"}, nil
 			}

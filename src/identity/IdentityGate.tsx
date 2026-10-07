@@ -151,28 +151,28 @@ export default function IdentityGate() {
   }
   return <main className="ft-identity-entry"><section className="ft-identity-card">
     <p className="ft-identity-eyebrow">A WORLD BEFORE CIVILIZATION</p><h1>FREE<span>TOWER</span></h1>
-    <p className="ft-identity-intro">你的角色，你的名字。<br/>A wallet. A character. Your .btc.</p>
+    <p className="ft-identity-intro">你的角色，你的名字。<br/>A wallet. A character. Your .fb.</p>
     {devAllowed&&<p className="ft-dev-banner">DEV ACCEPTANCE · 模拟身份，不代表链上验证</p>}
-    <ol className="ft-identity-steps"><li className={session?'done':''}>{session?'✓':'1'} Wallet verified</li><li className={asset?'done':''}>2 Character asset</li><li className={name?'done':''}>3 .btc name</li></ol>
+    <ol className="ft-identity-steps"><li className={session?'done':''}>{session?'✓':'1'} Wallet verified</li><li className={asset?'done':''}>2 Character asset</li><li className={name?'done':''}>3 .fb name</li></ol>
     {!config?<button disabled={busy} onClick={()=>setReload(n=>n+1)}>{busy?'Connecting…':'Retry service connection'}</button>:!session?<>
       {!connection?<button className="ft-identity-primary" disabled={busy} onClick={()=>void connect()}>{busy?'Waiting for wallet…':'Connect Wallet · UniSat'}</button>:<>
         <p className="ft-wallet-summary">UniSat · {short(connection.address)}</p>
         {connection.network!==FRACTAL_CHAIN?<><p role="status">Fractal Bitcoin Mainnet required. Current chain: {connection.network}</p><button disabled={busy} onClick={()=>void switchNetwork()}>Switch to Fractal Mainnet</button><button disabled={busy} onClick={()=>void connect()}>Retry network check</button></>:<><p className="ft-verified">Fractal Bitcoin Mainnet ✓</p><button className="ft-identity-primary" disabled={busy} onClick={()=>void authenticate()}>{busy?'Verify in UniSat…':'Sign in with wallet'}</button><small>Sign a one-time FreeTower message. No transaction or spending approval.</small></>}
         <button className="ft-identity-link" disabled={busy} onClick={()=>void disconnect()}>Disconnect</button>
       </>}
-      {devAllowed&&<div className="ft-dev-controls"><label>DEV persona<select value={persona} onChange={e=>setPersona(e.target.value as 'alice'|'bob')}><option value="alice">alice.btc</option><option value="bob">bob.btc</option></select></label><button disabled={busy} onClick={()=>void devConnect()}>Use DEV identity</button></div>}
+      {devAllowed&&<div className="ft-dev-controls"><label>DEV persona<select value={persona} onChange={e=>setPersona(e.target.value as 'alice'|'bob')}><option value="alice">alice.fb</option><option value="bob">bob.fb</option></select></label><button disabled={busy} onClick={()=>void devConnect()}>Use DEV identity</button></div>}
     </>:<>
       <p className="ft-verified">Wallet verified ✓ {session.dev?'· DEV':''}</p>
       {!options?<p>Loading eligible assets and names…</p>:<>
         <h2>Choose your character</h2>
         {options.assets.length===0?<p role="status">No eligible Character asset found</p>:<div className="ft-character-options">{options.assets.map(a=>{const id=a.assetId||a.inscriptionId;return <button key={id} className={asset===id?'selected':''} aria-pressed={asset===id} onClick={()=>setAsset(id)} disabled={busy}><span className="ft-character-preview" aria-hidden="true">♙</span><strong>Character</strong><small>{short(a.inscriptionId)}</small><small>{a.status||'eligible'} · Placeholder preview</small></button>})}</div>}
         <h2>Your public name</h2>
-        {options.names.length===0?<p role="status">No eligible .btc name found</p>:<label className="ft-name-select">Owned .btc<select value={name} onChange={e=>setName(e.target.value)} disabled={busy}>{options.names.map(n=><option key={n.name} value={n.name}>{n.name}</option>)}</select></label>}
+        {options.names.length===0?<p role="status">No eligible .fb name found</p>:<label className="ft-name-select">Owned .fb<select value={name} onChange={e=>setName(e.target.value)} disabled={busy}>{options.names.map(n=><option key={n.name} value={n.name}>{n.name}</option>)}</select></label>}
         <button className="ft-identity-primary" disabled={busy||!asset||!name} onClick={()=>void select()}>Enter FreeTower</button>
       </>}
       <div className="ft-identity-actions"><button disabled={busy} onClick={()=>void run(loadOptions)}>Retry verification</button><button disabled={busy} onClick={()=>void disconnect()}>Disconnect</button></div>
     </>}
     {error&&<div className="ft-identity-error" role="alert">{error}<button disabled={busy} onClick={()=>{setError('');if(!config)setReload(n=>n+1);}}>Dismiss</button></div>}
-    <footer>Fractal character ownership + verified .btc identity.<br/>角色与名称由服务端验证。</footer>
+    <footer>Fractal character ownership + verified .fb identity.<br/>角色与名称由服务端验证。</footer>
   </section></main>;
 }

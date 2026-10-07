@@ -148,7 +148,7 @@ func (s *identityService) devAllowed(r *http.Request) bool {
 }
 func newIdentityService() *identityService {
 	c := loadIdentityConfig()
-	return &identityService{bootID: newID(), config: c, challenges: map[string]walletChallenge{}, assets: &UniSatFractalOrdinalsProvider{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY"), allow: c.Assets}, names: &BNRPResolver{http: providerHTTP()}, verify: verifyBIP322}
+	return &identityService{bootID: newID(), config: c, challenges: map[string]walletChallenge{}, assets: &UniSatFractalOrdinalsProvider{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY"), allow: c.Assets}, names: &FractalNameResolver{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY")}, verify: verifyBIP322}
 }
 func identityUser(i CharacterIdentity) User {
 	mode := "wallet"

@@ -38,7 +38,7 @@ func (a *App) identityOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	valid := []BtcNameRecord{}
 	for _, n := range owned {
-		if !validBTCName(n.Name) || n.Owner != account.Address {
+		if !validFBName(n.Name) || n.Owner != account.Address {
 			continue
 		}
 		forward, e := names.Resolve(ctx, n.Name)
@@ -63,8 +63,8 @@ func (a *App) identitySelect(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &body) {
 		return
 	}
-	if !validBTCName(body.Name) || len(body.AssetID) > 150 || body.AssetID == "" {
-		identityError(w, 400, "invalid_selection", "Select an eligible character and owned .btc name")
+	if !validFBName(body.Name) || len(body.AssetID) > 150 || body.AssetID == "" {
+		identityError(w, 400, "invalid_selection", "Select an eligible character and owned .fb name")
 		return
 	}
 	// Provider calls happen outside the lock. Commit must re-read the exact session;
@@ -116,7 +116,7 @@ func (a *App) identitySelect(w http.ResponseWriter, r *http.Request) {
 			identityError(w, 503, "persistence_unavailable", "Ownership invalid; session revoked but status could not be saved")
 			return
 		}
-		identityError(w, 403, "domain_invalid", "Select a .btc name owned by this wallet")
+		identityError(w, 403, "domain_invalid", "Select a .fb name owned by this wallet")
 		return
 	}
 	a.identity.mu.Lock()

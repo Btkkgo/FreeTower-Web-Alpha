@@ -56,7 +56,7 @@ func TestPostgresWalletIdentityPersistenceAndAtomicity(t *testing.T) {
 					w = WalletAccount{ID: newID(), Address: providerAddress, Network: identityNetwork, Provider: "unisat"}
 					d.Wallets[key] = w
 				}
-				d.Identities["character"] = CharacterIdentity{ID: "character", WalletAccountID: w.ID, CharacterAssetID: "asset", BtcName: "alice.btc", Status: "active"}
+				d.Identities["character"] = CharacterIdentity{ID: "character", WalletAccountID: w.ID, CharacterAssetID: "asset", BtcName: "alice.fb", Status: "active"}
 				d.Sessions["session"] = walletSession{TokenHash: "session", WalletID: w.ID, IdentityID: "character", Network: identityNetwork, ExpiresAt: nowMS() + 100000}
 				return nil
 			})
@@ -71,7 +71,7 @@ func TestPostgresWalletIdentityPersistenceAndAtomicity(t *testing.T) {
 		}
 	}
 	d, e := other.identityState(ctx, nil)
-	if e != nil || len(d.Wallets) != 1 || d.Identities["character"].BtcName != "alice.btc" || len(d.Sessions) != 1 {
+	if e != nil || len(d.Wallets) != 1 || d.Identities["character"].BtcName != "alice.fb" || len(d.Sessions) != 1 {
 		t.Fatalf("roundtrip %v", e)
 	}
 	_, e = s.identityState(ctx, func(d *identityData) error { delete(d.Sessions, "session"); return errIdentity })
