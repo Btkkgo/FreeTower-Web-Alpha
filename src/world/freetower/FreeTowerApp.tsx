@@ -1,3 +1,6 @@
+import { publicCharacterName } from "../../identity/model";
+import { identityAPI } from "../../identity/api";
+import { recoverUnauthorized, reconnectSession } from "../../identity/recovery";
 import LifeHUD, { useLife } from "./life/LifeHUD";
 import BuildingHUD, { useBuilding } from "./building/BuildingHUD";
 import {
@@ -30,8 +33,8 @@ const initialMotion = (): Motion => ({
   ...locomotionAt(worldConfig.spawn),
 });
 type Chat = Extract<ServerMessage, { type: "chat" }>;
-export default function FreeTowerApp() {
-  const [user, setUser] = useState<User | null>(null),
+export default function FreeTowerApp({ identityUser, onIdentityDisconnect, onIdentityRevoked }: { identityUser?: User; onIdentityDisconnect?: () => Promise<void>; onIdentityRevoked?: () => void } = {}) {
+  const [user, setUser] = useState<User | null>(identityUser ?? null),
     [checking, setChecking] = useState(true),
     [rooms, setRooms] = useState<Room[]>([]),
     [detail, setDetail] = useState<RoomDetail | null>(null),
@@ -85,35 +88,41 @@ export default function FreeTowerApp() {
     const self = players.find((p) => p.id === user?.id);
     if (self) gathering.applyPlayer(self, serverOffset.current);
   }, [players, user?.id, gathering]);
+  const activeIdentity = useRef(true);
+  useEffect(() => { activeIdentity.current = true; return () => { activeIdentity.current = false; }; }, []);
+  const requestError = (error: unknown) => {
+    if (!activeIdentity.current) return;
+    if (identityUser && recoverUnauthorized(error, () => onIdentityRevoked?.())) return;
+    setError(error instanceof Error ? error.message : "请求失败，请重试");
+  };
   const perform = async (task: () => Promise<void>) => {
     setBusy(true);
     setError("");
     try {
       await task();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "请求失败，请重试");
+      requestError(e);
     } finally {
       setBusy(false);
     }
   };
   useEffect(() => {
     let active = true;
-    api
-      .me()
+    (identityUser ? Promise.resolve({ user: identityUser }) : api.me())
       .then(async ({ user }) => {
         if (!active) return;
         setUser(user);
         const r = await api.rooms();
         if (active) {
           setRooms(r.rooms);
-          const remembered = sessionStorage.getItem("freetower.room");
+          const remembered = sessionStorage.getItem(`freetower.room.${user.id}`);
           if (remembered && r.rooms.some((room) => room.id === remembered)) {
             const d = await api.room(remembered);
             if (active) setDetail(d);
           }
         }
       })
-      .catch(() => {})
+      .catch(error => { if (active) requestError(error); })
       .finally(() => {
         if (active) setChecking(false);
       });
@@ -122,7 +131,7 @@ export default function FreeTowerApp() {
     };
   }, []);
   const enter = (d: RoomDetail) => {
-    sessionStorage.setItem("freetower.room", d.room.id);
+    sessionStorage.setItem(`freetower.room.${user?.id}`, d.room.id);
     motion.current = initialMotion();
     setDetail(d);
     setSettings(false);
@@ -220,20 +229,29 @@ export default function FreeTowerApp() {
           );
         } else if (msg.type === "chat") setChat((c) => [...c.slice(-5), msg]);
         else if (msg.type === "roomDeleted") {
-          sessionStorage.removeItem("freetower.room");
+          sessionStorage.removeItem(`freetower.room.${user?.id}`);
           setDetail(null);
           setError("这个世界已被主人删除。");
           api
             .rooms()
             .then((r) => setRooms(r.rooms))
-            .catch(() => {});
+            .catch(error => { if (!disposed) requestError(error); });
         } else if (msg.type === "error") setError(msg.message);
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (disposed) return;
+        if (event.code === 4001 && identityUser) { onIdentityRevoked?.(); return; }
         setConnected(false);
         setPlayers([]);
-        timer = setTimeout(connect, Math.min(5000, 500 + ++attempt * 700));
+        const retry = async () => {
+          if (identityUser) {
+            const result = await reconnectSession(signal => identityAPI.me(signal), identityUser.id);
+            if (disposed) return;
+            if (result === "expired") { onIdentityRevoked?.(); return; }
+          }
+          if (!disposed) timer = setTimeout(connect, Math.min(5000, 500 + ++attempt * 700));
+        };
+        void retry();
       };
       socket.onerror = () => socket.close();
     };
@@ -335,7 +353,7 @@ export default function FreeTowerApp() {
             <div className="ft-chat-log" aria-live="polite">
               {chat.map((c, i) => (
                 <p key={`${c.at}-${i}`}>
-                  <b>{c.username}</b> {c.text}
+                  <b>{publicCharacterName(c)}</b> {c.text}
                 </p>
               ))}
             </div>
@@ -380,16 +398,17 @@ export default function FreeTowerApp() {
               <p>Position resets at reconnect. World progress stays saved.</p>
               <button
                 onClick={() => {
-                  sessionStorage.removeItem("freetower.room");
+                  sessionStorage.removeItem(`freetower.room.${user?.id}`);
                   setDetail(null);
                   void perform(async () => setRooms((await api.rooms()).rooms));
                 }}
               >
                 返回世界列表
               </button>
-              <a href="/?experience=little-flock">Little Flock 兼容入口</a>
+              {!identityUser && <a href="/?legacyAuth=1&experience=little-flock">DEV · Little Flock 兼容入口</a>}
             </aside>
           )}
+          <div className="ft-online-names" aria-label="Online characters">{players.filter(p => p.world === "freetower").map(p => <span key={p.id}>{publicCharacterName(p)}</span>)}</div>
           {debug && readout && (
             <output className="ft-debug">
               FPS {readout.fps} · Calls {readout.calls} · Triangles{" "}
@@ -448,7 +467,7 @@ export default function FreeTowerApp() {
             </form>
           ) : (
             <div className="ft-lobby">
-              <h2>{user.username}，选择一个世界</h2>
+              <h2>{publicCharacterName(user)}，选择一个世界</h2>
               <div className="ft-room-list">
                 {rooms.map((r) => (
                   <button
@@ -502,8 +521,9 @@ export default function FreeTowerApp() {
                 className="ft-link"
                 onClick={() =>
                   void perform(async () => {
+                    if (onIdentityDisconnect) { await onIdentityDisconnect(); return; }
                     await api.logout();
-                    sessionStorage.removeItem("freetower.room");
+                    sessionStorage.removeItem(`freetower.room.${user?.id}`);
                     setUser(null);
                     setRooms([]);
                   })

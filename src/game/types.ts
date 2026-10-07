@@ -38,6 +38,10 @@ export interface AvatarAppearance {
   hat: number;
 }
 export interface User {
+  characterIdentityId?: string;
+  btcName?: string;
+  characterAssetId?: string;
+  identityMode?: "wallet" | "dev" | "legacy";
   avatar: AvatarAppearance;
   id: string;
   username: string;
@@ -142,6 +146,9 @@ export interface RoomDetail {
   serverTime: number;
 }
 export interface Player {
+  characterIdentityId?: string;
+  btcName?: string;
+  characterAssetId?: string;
   hands?: HandState;
   gatherAction?: GatherAction;
   world?: string;
@@ -203,7 +210,7 @@ export type ServerMessage =
   | { type: "state"; state: FarmState; serverTime: number }
   | { type: "presence"; players: Player[] }
   | { type: "whistle"; position: Vec2; at: number }
-  | { type: "chat"; userId: string; username: string; text: string; at: number }
+  | { type: "chat"; characterIdentityId?: string; btcName?: string; characterAssetId?: string; userId: string; username: string; text: string; at: number }
   | { type: "event"; text: string; at: number }
   | { type: "error"; message: string };
 

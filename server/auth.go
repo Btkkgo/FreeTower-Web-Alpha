@@ -60,6 +60,19 @@ func remoteKey(r *http.Request) string {
 	return host
 }
 func (a *App) currentUser(r *http.Request) (User, error) {
+	if hash := requestWalletHash(r); hash != "" {
+		_, _, i, e := a.walletCurrent(r.Context(), hash)
+		if e != nil {
+			return User{}, e
+		}
+		if i == nil {
+			return User{}, errNotFound
+		}
+		return identityUser(*i), nil
+	}
+	if !a.identity.config.LegacyEnabled {
+		return User{}, errNotFound
+	}
 	c, err := r.Cookie("flock_session")
 	if err != nil {
 		return User{}, err
@@ -67,7 +80,9 @@ func (a *App) currentUser(r *http.Request) (User, error) {
 	if len(c.Value) != 64 {
 		return User{}, errNotFound
 	}
-	return a.store.sessionUser(r.Context(), tokenHash(c.Value))
+	u, e := a.store.sessionUser(r.Context(), tokenHash(c.Value))
+	u.IdentityMode = "legacy"
+	return u, e
 }
 func secureRequest(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
@@ -77,6 +92,10 @@ func setSessionCookie(w http.ResponseWriter, r *http.Request, token string, maxA
 }
 func (a *App) auth(w http.ResponseWriter, r *http.Request) {
 	endpoint := r.PathValue("action")
+	if endpoint != "me" && !a.identity.config.LegacyEnabled {
+		identityError(w, 403, "legacy_disabled", "Use wallet authentication")
+		return
+	}
 	if endpoint == "me" && r.Method == "GET" {
 		u, err := a.currentUser(r)
 		if err != nil {
@@ -196,7 +215,21 @@ func (a *App) updateProfile(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 429, "换装有点快，稍等一会儿再试吧")
 		return
 	}
-	if err := a.store.updateAvatar(r.Context(), u.ID, *v); err != nil {
+	var saveError error
+	if u.CharacterIdentityID != "" {
+		_, saveError = a.store.identityState(r.Context(), func(d *identityData) error {
+			i, ok := d.Identities[u.ID]
+			if !ok {
+				return errNotFound
+			}
+			i.Avatar = *v
+			d.Identities[u.ID] = i
+			return nil
+		})
+	} else {
+		saveError = a.store.updateAvatar(r.Context(), u.ID, *v)
+	}
+	if err := saveError; err != nil {
 		a.internal(w, err)
 		return
 	}

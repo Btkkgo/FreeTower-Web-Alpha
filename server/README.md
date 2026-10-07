@@ -115,3 +115,10 @@ go vet ./...
 Set `TEST_DATABASE_URL` to a **test database** to also exercise real PostgreSQL schema creation, account uniqueness, session revocation, and JSONB persistence through a newly opened connection pool. That test creates and removes an isolated schema. The PostgreSQL path has been verified locally against PostgreSQL 16.
 
 Tests cover account avatar validation/live presence/persistence, owner-only farm deletion with member ejection and failed-save rollback, the complete resource-balanced progression, locked regions and crops, real grazing location/time, offline pause, daily stargazing, farming, premature/duplicate actions, breeding cooldown and maturity, pause behavior, password/session authentication, membership checks, two-player atomic shearing, save-failure rollback, restart persistence, live two-client WebSocket chat/state, cross-origin rejection, and static SPA serving. The production deployment must additionally be verified against its running database and public `/api/health` endpoint.
+
+
+## Fractal wallet identity (FT-WEB-005)
+
+Server configuration is documented in `identity.env.example`. Production defaults to wallet authority, with no legacy or mock fallback; missing origin/provider/eligible-inscription configuration fails closed. Local DEV identity requires both `FT_ENV=development` and `FT_ENABLE_DEV_IDENTITY=true` and a permitted loopback origin.
+
+Wallet cookies have a maximum 24-hour lifetime and are valid only for the server instance that created them. Every restart requires a fresh wallet login and character/name ownership selection. Wallet accounts, immutable character IDs, rooms, buildings and personal inventory persist normally. This boot-epoch boundary also prevents an old active cookie from reviving after ownership invalidation could not be saved. Startup does not call external ownership providers.

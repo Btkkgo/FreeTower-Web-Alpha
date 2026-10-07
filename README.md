@@ -1,3 +1,5 @@
+> **FreeTower fork — FT-WEB-005:** The default app now requires a Fractal UniSat wallet, an approved owned Character inscription, and a verified owned `.btc` name. For current setup, explicit DEV acceptance mode, migration boundaries and test evidence, see [FreeTower identity documentation](docs/freetower/FT-WEB-005-FRACTAL-IDENTITY.md) and [server configuration example](server/identity.env.example). The upstream Little Flock description and account-registration instructions below are retained as historical attribution; legacy authentication is disabled by default.
+
 <div align="center">
 
 # Little Flock · 小羊慢慢

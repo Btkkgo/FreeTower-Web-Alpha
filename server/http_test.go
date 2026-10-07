@@ -27,6 +27,8 @@ type harness struct {
 }
 
 func newHarness(t *testing.T) *harness {
+	t.Setenv("FT_ENV", "development")
+	t.Setenv("FT_ENABLE_LEGACY_AUTH", "true")
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "farm.json")
 	s, err := openStore("", path)

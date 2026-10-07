@@ -19,6 +19,7 @@ var errNotFound = errors.New("not found")
 var errExists = errors.New("already exists")
 
 type diskData struct {
+	Identity *identityData              `json:"identity,omitempty"`
 	Accounts map[string]Account         `json:"accounts"`
 	Sessions map[string]Session         `json:"sessions"`
 	Rooms    map[string]json.RawMessage `json:"rooms"`
@@ -44,6 +45,8 @@ func openStore(databaseURL, path string) (*Store, error) {
 ALTER TABLE sheep_accounts ADD COLUMN IF NOT EXISTS avatar JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS sheep_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES sheep_accounts(id) ON DELETE CASCADE, expires_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS sheep_sessions_expiry ON sheep_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS freetower_identity_state (id INTEGER PRIMARY KEY CHECK(id=1),data JSONB NOT NULL);
+INSERT INTO freetower_identity_state(id,data) VALUES(1,'{"wallets":{},"identities":{},"sessions":{}}'::jsonb) ON CONFLICT(id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS sheep_rooms (id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());`)
 		if err != nil {
 			db.Close()

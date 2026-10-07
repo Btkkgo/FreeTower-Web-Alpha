@@ -33,6 +33,7 @@ type RuntimeRoom struct {
 	lastPersist      int64
 }
 type App struct {
+	identity   *identityService
 	store      *Store
 	mu         sync.RWMutex
 	rooms      map[string]*RuntimeRoom
@@ -49,7 +50,7 @@ func newApp(store *Store, staticDir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{store: store, rooms: map[string]*RuntimeRoom{}, staticDir: staticDir, stop: make(chan struct{}), tickerDone: make(chan struct{})}
+	a := &App{identity: newIdentityService(), store: store, rooms: map[string]*RuntimeRoom{}, staticDir: staticDir, stop: make(chan struct{}), tickerDone: make(chan struct{})}
 	for _, r := range records {
 		r.State.UpdatedAt = nowMS()
 		r.Room.OnlineCount = 0
@@ -78,6 +79,7 @@ func (a *App) routes() http.Handler {
 		}
 		writeJSON(w, 200, map[string]any{"ok": true, "service": "little-flock", "time": nowMS()})
 	})
+	a.identityRoutes(mux)
 	mux.HandleFunc("/api/auth/{action}", a.auth)
 	mux.HandleFunc("PATCH /api/auth/profile", a.updateProfile)
 	mux.HandleFunc("GET /api/rooms", a.listRooms)
@@ -100,6 +102,12 @@ func (a *App) routes() http.Handler {
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+		}
+		// Serialize authenticated world mutations with identity revocation. Provider
+		// requests never hold this lock; room handlers finish before logout returns.
+		if strings.HasPrefix(r.URL.Path, "/api/rooms") && r.Method != "GET" {
+			a.identity.mu.Lock()
+			defer a.identity.mu.Unlock()
 		}
 		mux.ServeHTTP(w, r)
 	})

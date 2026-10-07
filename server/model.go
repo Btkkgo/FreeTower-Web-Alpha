@@ -48,6 +48,11 @@ type AvatarAppearance struct {
 	Hat    int `json:"hat"`
 }
 type User struct {
+	CharacterIdentityID string `json:"characterIdentityId,omitempty"`
+	BtcName             string `json:"btcName,omitempty"`
+	CharacterAssetID    string `json:"characterAssetId,omitempty"`
+	IdentityMode        string `json:"identityMode,omitempty"`
+
 	Avatar       AvatarAppearance `json:"avatar"`
 	ID           string           `json:"id"`
 	Username     string           `json:"username"`
@@ -195,6 +200,11 @@ type Action struct {
 	UpgradeID     string `json:"upgradeId,omitempty"`
 }
 type Player struct {
+	CharacterIdentityID string `json:"characterIdentityId,omitempty"`
+	BtcName             string `json:"btcName,omitempty"`
+	CharacterAssetID    string `json:"characterAssetId,omitempty"`
+	IdentityMode        string `json:"identityMode,omitempty"`
+
 	Hands        *HandState       `json:"hands,omitempty"`
 	GatherAction *GatherAction    `json:"gatherAction,omitempty"`
 	World        string           `json:"world,omitempty"`

@@ -1,10 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
-import FreeTowerApp from "./world/freetower/FreeTowerApp";
-const LegacyApp = React.lazy(() => import("./App"));
-const legacy =
-  new URLSearchParams(location.search).get("experience") === "little-flock";
+import IdentityGate from "./identity/IdentityGate";
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -30,7 +27,7 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <React.Suspense fallback={<div>Loading…</div>}>
-      {legacy ? <LegacyApp /> : <FreeTowerApp />}
+      <IdentityGate />
     </React.Suspense>
   </ErrorBoundary>,
 );

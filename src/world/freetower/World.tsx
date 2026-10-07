@@ -1,3 +1,4 @@
+import { publicCharacterName } from "../../identity/model";
 import LifeScene from "./life/LifeScene";
 import type {LifeController} from "./life/controller";
 import {activeItem} from "./gathering/model";
@@ -796,7 +797,7 @@ function Runtime({
           <Explorer
             key={p.id}
             remote={p}
-            name={p.username}
+            name={publicCharacterName(p)}
             color={p.color}
             gathering={gathering}
         life={life}

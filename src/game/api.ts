@@ -1,5 +1,10 @@
 import type { ActionResult, AvatarAppearance, GameAction, Room, RoomDetail, User } from "./types";
 
+export class GameAPIError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) { super(message); this.status = status; }
+}
+
 async function request<T>(
   path: string,
   body?: unknown,
@@ -15,7 +20,7 @@ async function request<T>(
   const data = await response
     .json()
     .catch(() => ({ error: "牧场暂时没有回应，请稍后再试。" }));
-  if (!response.ok) throw new Error(data.error || "操作未完成，请再试一次。");
+  if (!response.ok) throw new GameAPIError(data.error || "操作未完成，请再试一次。", response.status);
   return data as T;
 }
 export const api = {
