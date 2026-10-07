@@ -42,6 +42,7 @@ func (a *App) identityRoutes(m *http.ServeMux) {
 	m.HandleFunc("GET /api/identity/me", a.identityMe)
 	m.HandleFunc("GET /api/identity/options", a.identityOptions)
 	m.HandleFunc("POST /api/identity/select", a.identitySelect)
+	m.HandleFunc("POST /api/acceptance/ordinal-ownership", a.ordinalOwnershipAcceptance)
 }
 func (a *App) identityOrigin(w http.ResponseWriter, r *http.Request) bool {
 	if !a.identity.originAllowed(r) {

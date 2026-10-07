@@ -93,12 +93,13 @@ type walletChallenge struct {
 	Binding         string `json:"-"`
 }
 type identityConfig struct {
-	Development   bool
-	DevEnabled    bool
-	LegacyEnabled bool
-	Origin        string
-	Origins       map[string]bool
-	Assets        map[string]bool
+	Development                bool
+	DevEnabled                 bool
+	LegacyEnabled              bool
+	OwnershipAcceptanceEnabled bool
+	Origin                     string
+	Origins                    map[string]bool
+	Assets                     map[string]bool
 }
 type identityService struct {
 	// A fresh cryptographically random epoch deliberately invalidates all wallet
@@ -118,6 +119,7 @@ func loadIdentityConfig() identityConfig {
 	c := identityConfig{Development: os.Getenv("FT_ENV") == "development", Origin: os.Getenv("FT_PUBLIC_ORIGIN"), Origins: map[string]bool{}, Assets: map[string]bool{}}
 	c.DevEnabled = c.Development && os.Getenv("FT_ENABLE_DEV_IDENTITY") == "true"
 	c.LegacyEnabled = c.Development && os.Getenv("FT_ENABLE_LEGACY_AUTH") == "true"
+	c.OwnershipAcceptanceEnabled = c.Development && os.Getenv("FT_ENABLE_OWNERSHIP_ACCEPTANCE") == "true"
 	for _, raw := range append(strings.Split(os.Getenv("FT_ALLOWED_ORIGINS"), ","), c.Origin) {
 		raw = strings.TrimSpace(raw)
 		u, e := url.Parse(raw)
