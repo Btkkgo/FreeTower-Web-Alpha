@@ -1,3 +1,10 @@
+import type {
+  HandState,
+  GatherAction,
+  ResourceState,
+  ResourceHit,
+  GatheringMessage,
+} from "../world/freetower/gathering/model";
 export type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export type Season = "春日" | "夏日" | "秋日" | "冬日";
 export type Vec2 = { x: number; z: number };
@@ -86,6 +93,7 @@ export interface Order {
   completed: boolean;
 }
 export interface FarmState {
+  freeTower?: ResourceState;
   progression: { step: number; forestFinds: number; lastStargazeDay: number };
   buildings: { shelter: boolean; garden: boolean };
   regions: RegionId[];
@@ -129,6 +137,8 @@ export interface RoomDetail {
   serverTime: number;
 }
 export interface Player {
+  hands?: HandState;
+  gatherAction?: GatherAction;
   world?: string;
   movementMode?: "land" | "shallow-water" | "swimming";
   moving?: boolean;
@@ -165,10 +175,21 @@ export interface ActionResult {
   serverTime: number;
 }
 export type ClientMessage =
-  | { type: "move"; position: Vec2; facing: number; jump?: boolean; movementMode?: "land" | "shallow-water" | "swimming"; moving?: boolean; running?: boolean }
+  | GatheringMessage
+  | {
+      type: "move";
+      position: Vec2;
+      facing: number;
+      jump?: boolean;
+      movementMode?: "land" | "shallow-water" | "swimming";
+      moving?: boolean;
+      running?: boolean;
+    }
   | { type: "whistle" }
   | { type: "chat"; text: string };
 export type ServerMessage =
+  | ({ type: "resource-hit" } & ResourceHit)
+  | { type: "gather-error"; code: string; message: string }
   | { type: "roomDeleted"; roomId: string }
   | { type: "state"; state: FarmState; serverTime: number }
   | { type: "presence"; players: Player[] }

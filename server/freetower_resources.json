@@ -1,0 +1,164 @@
+{
+  "interactionRange": 2.8,
+  "holdMs": 350,
+  "windupMs": 280,
+  "recoveryMs": 370,
+  "tools": [
+    {
+      "id": "basic-axe",
+      "type": "axe",
+      "displayName": "Basic Axe",
+      "assetId": "tool.axe.basic",
+      "gatherPower": 1,
+      "cooldown": 800,
+      "validResourceTypes": [
+        "tree"
+      ],
+      "handUsage": "one"
+    },
+    {
+      "id": "basic-pickaxe",
+      "type": "pickaxe",
+      "displayName": "Basic Pickaxe",
+      "assetId": "tool.pickaxe.basic",
+      "gatherPower": 1,
+      "cooldown": 800,
+      "validResourceTypes": [
+        "rock"
+      ],
+      "handUsage": "one"
+    }
+  ],
+  "items": [
+    {
+      "id": "wood",
+      "displayName": "Wood",
+      "assetId": "item.wood.basic",
+      "category": "resource"
+    },
+    {
+      "id": "stone",
+      "displayName": "Stone",
+      "assetId": "item.stone.basic",
+      "category": "resource"
+    }
+  ],
+  "definitions": [
+    {
+      "id": "tree-basic",
+      "type": "tree",
+      "assetId": "environment.tree.basic",
+      "maxDurability": 3,
+      "requiredTool": "axe",
+      "respawnSeconds": 60,
+      "drops": [
+        {
+          "itemId": "wood",
+          "quantity": 4
+        }
+      ]
+    },
+    {
+      "id": "rock-basic",
+      "type": "rock",
+      "assetId": "environment.rock.basic",
+      "maxDurability": 4,
+      "requiredTool": "pickaxe",
+      "respawnSeconds": 75,
+      "drops": [
+        {
+          "itemId": "stone",
+          "quantity": 3
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "tree-1",
+      "definitionId": "tree-basic",
+      "position": {
+        "x": -13.910968505921797,
+        "z": -17.450264344859693
+      },
+      "scale": 1.5450123415979466,
+      "treeIndex": 81
+    },
+    {
+      "id": "tree-2",
+      "definitionId": "tree-basic",
+      "position": {
+        "x": -15.345369849260507,
+        "z": -20.780316906699497
+      },
+      "scale": 1.2337677965408926,
+      "treeIndex": 68
+    },
+    {
+      "id": "tree-3",
+      "definitionId": "tree-basic",
+      "position": {
+        "x": -19.196291504296678,
+        "z": -19.67164247713358
+      },
+      "scale": 1.516491311484807,
+      "treeIndex": 48
+    },
+    {
+      "id": "tree-4",
+      "definitionId": "tree-basic",
+      "position": {
+        "x": -10.671849110945573,
+        "z": -18.934116093682295
+      },
+      "scale": 1.2011033778383091,
+      "treeIndex": 106
+    },
+    {
+      "id": "tree-5",
+      "definitionId": "tree-basic",
+      "position": {
+        "x": -16.0,
+        "z": 17.0
+      },
+      "scale": 0.8,
+      "treeIndex": 110
+    },
+    {
+      "id": "rock-1",
+      "definitionId": "rock-basic",
+      "position": {
+        "x": 23,
+        "z": -13
+      },
+      "scale": 1.1
+    },
+    {
+      "id": "rock-2",
+      "definitionId": "rock-basic",
+      "position": {
+        "x": 29,
+        "z": -22
+      },
+      "scale": 1.1
+    },
+    {
+      "id": "rock-3",
+      "definitionId": "rock-basic",
+      "position": {
+        "x": 37,
+        "z": -25
+      },
+      "scale": 1.1
+    },
+    {
+      "id": "rock-4",
+      "definitionId": "rock-basic",
+      "position": {
+        "x": 41,
+        "z": -15
+      },
+      "scale": 1.1
+    }
+  ]
+}

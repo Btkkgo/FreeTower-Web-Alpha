@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -106,11 +107,17 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	c := &Client{conn: conn, user: u, player: Player{ID: u.ID, Username: u.Username, Avatar: u.Avatar, Position: Vec2{1, 7}, Color: colors[len(rr.clients)%len(colors)]}, send: make(chan []byte, 64), done: make(chan struct{})}
 	if r.URL.Query().Get("world") == "freetower" {
 		c.player.World = "freetower"
+		rr.ensureGathering()
+		c.player.Hands = defaultHands()
 		c.player.Position = freeTowerConfig.Spawn
 		c.player.MovementMode, c.player.Elevation = freeTowerLocomotion(c.player.Position)
 	}
 	rr.tick(nowMS())
 	rr.clients[c] = true
+	if c.player.World == "freetower" {
+		rr.gatheringUser(c)
+		rr.syncGatherUser(c.user.ID)
+	}
 	rr.broadcastPresence()
 	b, _ := json.Marshal(map[string]any{"type": "state", "state": rr.record.State, "serverTime": nowMS()})
 	c.send <- b
@@ -161,18 +168,52 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			return
 		}
 		var msg struct {
-			Type     string  `json:"type"`
-			Position Vec2    `json:"position"`
-			Facing   float64 `json:"facing"`
-			Jump     bool    `json:"jump"`
-			Moving   bool    `json:"moving"`
-			Running  bool    `json:"running"`
-			Text     string  `json:"text"`
+			Type       string    `json:"type"`
+			Hands      HandState `json:"hands"`
+			ResourceID string    `json:"resourceId"`
+			ToolID     string    `json:"toolId"`
+			ActionID   string    `json:"actionId"`
+			Position   Vec2      `json:"position"`
+			Facing     float64   `json:"facing"`
+			Jump       bool      `json:"jump"`
+			Moving     bool      `json:"moving"`
+			Running    bool      `json:"running"`
+			Text       string    `json:"text"`
 		}
 		if json.Unmarshal(b, &msg) != nil {
 			continue
 		}
 		switch msg.Type {
+		case "hands-set", "gather-start", "resource-hit", "gather-cancel":
+			rr.mu.Lock()
+			at := nowMS()
+			var gatherFailure error
+			switch msg.Type {
+			case "hands-set":
+				gatherFailure = rr.setHands(c, msg.Hands)
+			case "gather-start":
+				gatherFailure = rr.startGather(c, msg.ResourceID, msg.ToolID, msg.ActionID, at)
+			case "resource-hit":
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				gatherFailure = rr.hitGather(c, msg.ResourceID, msg.ToolID, msg.ActionID, at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
+				cancel()
+			case "gather-cancel":
+				rr.cancelGather(c)
+				rr.broadcastPresence()
+			}
+			if gatherFailure != nil {
+				code := "invalid"
+				if e, ok := gatherFailure.(*gatherError); ok {
+					code = e.Code
+				}
+				payload, _ := json.Marshal(map[string]any{"type": "gather-error", "code": code, "message": gatherFailure.Error()})
+				select {
+				case c.send <- payload:
+				default:
+					c.close()
+				}
+			}
+			rr.mu.Unlock()
 		case "move":
 			now := time.Now()
 			dt := now.Sub(lastMove).Seconds()
@@ -199,6 +240,9 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			if c.player.World == "freetower" {
 				c.player.Position = freeTowerPosition(msg.Position)
 				c.player.MovementMode, c.player.Elevation = freeTowerLocomotion(c.player.Position)
+				if distance > .01 || c.player.MovementMode == "swimming" {
+					rr.cancelGather(c)
+				}
 				c.player.Moving = msg.Moving
 				c.player.Running = msg.Running && c.player.MovementMode == "land"
 			} else {

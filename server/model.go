@@ -136,29 +136,30 @@ type ForageNode struct {
 	ReadyAt  int64  `json:"readyAt"`
 }
 type FarmState struct {
-	Progression  Progression    `json:"progression"`
-	Buildings    Buildings      `json:"buildings"`
-	Regions      []string       `json:"regions"`
-	Grazing      GrazingState   `json:"grazing"`
-	ForageNodes  []ForageNode   `json:"forageNodes"`
-	Version      int            `json:"version"`
-	CreatedAt    int64          `json:"createdAt"`
-	UpdatedAt    int64          `json:"updatedAt"`
-	Coins        int            `json:"coins"`
-	XP           int            `json:"xp"`
-	Level        int            `json:"level"`
-	Inventory    map[string]int `json:"inventory"`
-	Sheep        []Sheep        `json:"sheep"`
-	Plots        []Plot         `json:"plots"`
-	Orders       []Order        `json:"orders"`
-	Upgrades     Upgrades       `json:"upgrades"`
-	Stats        Stats          `json:"stats"`
-	Discoveries  []string       `json:"discoveries"`
-	Weather      string         `json:"weather"`
-	Day          int            `json:"day"`
-	DayProgress  float64        `json:"dayProgress"`
-	Season       string         `json:"season"`
-	ClockSeconds float64        `json:"clockSeconds"`
+	FreeTower    *FreeTowerState `json:"freeTower,omitempty"`
+	Progression  Progression     `json:"progression"`
+	Buildings    Buildings       `json:"buildings"`
+	Regions      []string        `json:"regions"`
+	Grazing      GrazingState    `json:"grazing"`
+	ForageNodes  []ForageNode    `json:"forageNodes"`
+	Version      int             `json:"version"`
+	CreatedAt    int64           `json:"createdAt"`
+	UpdatedAt    int64           `json:"updatedAt"`
+	Coins        int             `json:"coins"`
+	XP           int             `json:"xp"`
+	Level        int             `json:"level"`
+	Inventory    map[string]int  `json:"inventory"`
+	Sheep        []Sheep         `json:"sheep"`
+	Plots        []Plot          `json:"plots"`
+	Orders       []Order         `json:"orders"`
+	Upgrades     Upgrades        `json:"upgrades"`
+	Stats        Stats           `json:"stats"`
+	Discoveries  []string        `json:"discoveries"`
+	Weather      string          `json:"weather"`
+	Day          int             `json:"day"`
+	DayProgress  float64         `json:"dayProgress"`
+	Season       string          `json:"season"`
+	ClockSeconds float64         `json:"clockSeconds"`
 }
 type Room struct {
 	ID          string `json:"id"`
@@ -194,6 +195,8 @@ type Action struct {
 	UpgradeID     string `json:"upgradeId,omitempty"`
 }
 type Player struct {
+	Hands        *HandState       `json:"hands,omitempty"`
+	GatherAction *GatherAction    `json:"gatherAction,omitempty"`
 	World        string           `json:"world,omitempty"`
 	MovementMode string           `json:"movementMode,omitempty"`
 	Moving       bool             `json:"moving,omitempty"`

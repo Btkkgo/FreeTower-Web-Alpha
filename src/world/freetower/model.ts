@@ -132,6 +132,7 @@ export function advanceMovement(
   input: Point,
   run: boolean,
   dt: number,
+  depletedTreeIndices: number[] = [],
 ) {
   const n = Math.hypot(input.x, input.z);
   if (!n) return p;
@@ -140,7 +141,8 @@ export function advanceMovement(
     { x: p.x + (input.x / n) * v, z: p.z + (input.z / n) * v },
     p,
   );
-  for (const t of trees) {
+  for (const [i, t] of trees.entries()) {
+    if (depletedTreeIndices.includes(i)) continue;
     const dx = q.x - t.x,
       dz = q.z - t.z,
       d = Math.hypot(dx, dz),

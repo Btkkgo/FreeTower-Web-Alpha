@@ -4,7 +4,15 @@ import {
   useThree,
   type ThreeEvent,
 } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import Explorer from "./Explorer";
+import ResourceScene from "./gathering/ResourceScene";
+import {
+  nodes as resourceNodes,
+  cancelApproach,
+  distanceTo,
+  config as gatheringConfig,
+  type GatheringController,
+} from "./gathering/model";
 import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
 import type { Player } from "../../game/types";
@@ -46,6 +54,7 @@ export interface Readout {
   region: string;
 }
 interface Props {
+  gathering: GatheringController;
   players: Player[];
   selfId?: string;
   motion: MutableRefObject<Motion>;
@@ -117,7 +126,7 @@ function Forest() {
   useEffect(() => {
     trees.forEach((p, i) => {
       const y = terrainHeight(p),
-        s = p.scale;
+        s = resourceNodes.some((n) => n.treeIndex === i) ? 0 : p.scale;
       dummy.position.set(p.x, y + 2 * s, p.z);
       dummy.scale.set(s, 4 * s, s);
       dummy.rotation.set(0, i, 0);
@@ -427,122 +436,6 @@ function Boundaries() {
     </group>
   );
 }
-function Explorer({
-  motion,
-  remote,
-  name,
-  color,
-}: {
-  motion?: MutableRefObject<Motion>;
-  remote?: Player;
-  name: string;
-  color: string;
-}) {
-  const root = useRef<THREE.Group>(null),
-    body = useRef<THREE.Group>(null),
-    left = useRef<THREE.Group>(null),
-    right = useRef<THREE.Group>(null),
-    legL = useRef<THREE.Group>(null),
-    legR = useRef<THREE.Group>(null);
-  const initialized = useRef(false);
-  useFrame(({ clock }, dt) => {
-    const m = motion?.current;
-    const p = m?.position ?? remote!.position,
-      mode = m?.mode ?? remote?.movementMode ?? "land",
-      moving = m?.moving ?? remote?.moving ?? false,
-      running = m?.running ?? remote?.running ?? false,
-      y = m?.elevation ?? remote?.elevation ?? locomotionAt(p).elevation;
-    const swim = mode === "swimming",
-      t = clock.elapsedTime * (swim ? 3 : running ? 11 : 7),
-      jumpAt = m?.jumpAt ?? remote?.jumpAt ?? 0,
-      jt = (Date.now() - jumpAt) / 650,
-      jump = !swim && jt >= 0 && jt < 1 ? Math.sin(jt * Math.PI) * 1.2 : 0;
-    const target = new THREE.Vector3(p.x, y + jump, p.z);
-    if (!initialized.current) {
-      root.current!.position.copy(target);
-      initialized.current = true;
-    } else
-      root.current!.position.lerp(target, 1 - Math.exp(-dt * (m ? 24 : 14)));
-    const facing = m?.facing ?? remote?.facing ?? 0;
-    root.current!.rotation.y +=
-      Math.atan2(
-        Math.sin(facing - root.current!.rotation.y),
-        Math.cos(facing - root.current!.rotation.y),
-      ) *
-      (1 - Math.exp(-dt * 16));
-    body.current!.rotation.x = THREE.MathUtils.damp(
-      body.current!.rotation.x,
-      swim ? Math.PI * 0.38 : 0,
-      10,
-      dt,
-    );
-    body.current!.position.y = swim ? 0.18 : 0;
-    left.current!.rotation.x = swim
-      ? -1.4 + Math.sin(t) * 0.8
-      : moving
-        ? Math.sin(t) * 0.65
-        : 0;
-    right.current!.rotation.x = swim
-      ? -1.4 - Math.sin(t) * 0.8
-      : moving
-        ? -Math.sin(t) * 0.65
-        : 0;
-    legL.current!.rotation.x = moving ? Math.sin(t) * (swim ? 0.22 : 0.65) : 0;
-    legR.current!.rotation.x = -legL.current!.rotation.x;
-  });
-  const limb = (ref: typeof left, x: number, arm: boolean) => (
-    <group ref={ref} position={[x, arm ? 1.15 : 0.68, 0]}>
-      <mesh position={[0, arm ? -0.26 : -0.29, 0]} castShadow>
-        <capsuleGeometry args={[arm ? 0.105 : 0.12, arm ? 0.33 : 0.4, 3, 6]} />
-        <meshStandardMaterial color={arm ? color : "#384b58"} />
-      </mesh>
-      {arm && (
-        <mesh position={[0, -0.5, 0]}>
-          <sphereGeometry args={[0.11, 6, 5]} />
-          <meshStandardMaterial color="#cba887" />
-        </mesh>
-      )}
-    </group>
-  );
-  return (
-    <group ref={root}>
-      <group ref={body}>
-        <mesh position={[0, 0.97, 0]} castShadow>
-          <capsuleGeometry args={[0.27, 0.42, 4, 8]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-        <mesh position={[0, 1.52, 0]} castShadow>
-          <sphereGeometry args={[0.23, 8, 6]} />
-          <meshStandardMaterial color="#cba887" />
-        </mesh>
-        <mesh position={[0, 1.67, -0.035]}>
-          <sphereGeometry args={[0.23, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color="#383632" />
-        </mesh>
-        <mesh position={[0, 1.2, -0.26]}>
-          <boxGeometry args={[0.38, 0.42, 0.18]} />
-          <meshStandardMaterial color="#79694e" />
-        </mesh>
-        <mesh position={[0, 1.22, 0.21]}>
-          <boxGeometry args={[0.4, 0.085, 0.12]} />
-          <meshStandardMaterial color={gold} />
-        </mesh>
-        {limb(left, -0.36, true)}
-        {limb(right, 0.36, true)}
-        {limb(legL, -0.15, false)}
-        {limb(legR, 0.15, false)}
-      </group>
-      {remote && (
-        <Html position={[0, 2.25, 0]} center distanceFactor={20}>
-          <span className="ft-name">
-            {name}
-            {remote.movementMode === "swimming" ? " · Swimming" : ""}
-          </span>
-        </Html>
-      )}
-    </group>
-  );
-}
 function Runtime({
   players,
   selfId,
@@ -551,6 +444,7 @@ function Runtime({
   onMove,
   onReadout,
   debug,
+  gathering,
 }: Props) {
   const { camera, gl } = useThree();
   const keys = useRef(new Set<string>()),
@@ -683,6 +577,9 @@ function Runtime({
     };
   }, [gl]);
   useFrame(({ clock }, dt) => {
+    gathering.position = motion.current.position;
+    gathering.mode = motion.current.mode;
+    gathering.tick();
     const m = motion.current,
       k = keys.current,
       o = orbit.current;
@@ -694,6 +591,25 @@ function Runtime({
         (k.has("KeyS") || k.has("ArrowDown") ? 1 : 0);
     let input = cameraInput(sx, sz, o.yaw);
     route.current = cancelNavigation(route.current, input);
+    gathering.approachId = cancelApproach(gathering.approachId, input);
+    if (gathering.wheel || gathering.action) route.current = [];
+
+    if (!sx && !sz && gathering.approachId) {
+      const resource = gathering.state?.nodes[gathering.approachId];
+      route.current = [];
+      if (
+        !resource ||
+        resource.depleted ||
+        distanceTo(m.position, resource.position) <=
+          gatheringConfig.interactionRange - 0.3
+      )
+        gathering.approachId = null;
+      else
+        input = {
+          x: resource.position.x - m.position.x,
+          z: resource.position.z - m.position.z,
+        };
+    }
     if (!sx && !sz && route.current.length) {
       const p = route.current[0],
         dx = p.x - m.position.x,
@@ -701,20 +617,39 @@ function Runtime({
       if (Math.hypot(dx, dz) < 0.25) route.current.shift();
       else input = { x: dx, z: dz };
     }
-    m.moving = ready && Math.hypot(input.x, input.z) > 0.01;
+    m.moving =
+      ready && !gathering.locked() && Math.hypot(input.x, input.z) > 0.01;
     m.running = m.moving && (k.has("ShiftLeft") || k.has("ShiftRight"));
     if (m.moving) {
       const before = m.position;
-      m.position = advanceMovement(m.position, input, m.running, dt);
+      m.position = advanceMovement(
+        m.position,
+        input,
+        m.running,
+        dt,
+        resourceNodes
+          .filter((n) => gathering.state?.nodes[n.id]?.depleted)
+          .map((n) => n.treeIndex)
+          .filter((n): n is number => n !== undefined),
+      );
       stuckTime.current =
         Math.hypot(m.position.x - before.x, m.position.z - before.z) < 0.002
           ? stuckTime.current + dt
           : 0;
       if (stuckTime.current > 0.5) {
         route.current = [];
+        gathering.approachId = null;
         m.moving = false;
       }
       m.facing = Math.atan2(input.x, input.z);
+    }
+    if (gathering.action) {
+      const resource = gathering.state?.nodes[gathering.action.resourceId];
+      if (resource)
+        m.facing = Math.atan2(
+          resource.position.x - m.position.x,
+          resource.position.z - m.position.z,
+        );
     }
     const state = locomotionAt(m.position);
     m.mode = state.mode;
@@ -722,6 +657,7 @@ function Runtime({
     if (m.mode !== "land") m.running = false;
     const jump =
       ready &&
+      !gathering.locked() &&
       pendingJump.current &&
       m.mode !== "swimming" &&
       Date.now() - m.jumpAt > 650;
@@ -784,7 +720,8 @@ function Runtime({
     }
   });
   const onTarget = (p: Point) => {
-    if (ready) {
+    if (ready && !gathering.locked()) {
+      gathering.approachId = null;
       route.current = [constrainPosition(p, motion.current.position)];
       stuckTime.current = 0;
     }
@@ -793,17 +730,29 @@ function Runtime({
     <>
       <Landscape onTarget={onTarget} />
       <Forest />
+      <ResourceScene controller={gathering} />
       <Rocks />
       <GroundDetails />
       <Water onTarget={onTarget} />
       <Ruins />
       <Tower />
       <Boundaries />
-      <Explorer motion={motion} name="You" color="#496b79" />
+      <Explorer
+        motion={motion}
+        name="You"
+        color="#496b79"
+        gathering={gathering}
+      />
       {players
         .filter((p) => p.id !== selfId && p.world === "freetower")
         .map((p) => (
-          <Explorer key={p.id} remote={p} name={p.username} color={p.color} />
+          <Explorer
+            key={p.id}
+            remote={p}
+            name={p.username}
+            color={p.color}
+            gathering={gathering}
+          />
         ))}
       <mesh ref={marker} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.25, 0.4, 24]} />

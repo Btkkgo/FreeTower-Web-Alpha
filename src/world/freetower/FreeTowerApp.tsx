@@ -16,6 +16,9 @@ import type {
 import FreeTowerWorld, { type Motion, type Readout } from "./World";
 import { locomotionAt, movePayload, worldConfig } from "./model";
 import "./freetower.css";
+import { playGatherHit } from "./gathering/audio";
+import GatheringHUD, { useGathering } from "./gathering/GatheringHUD";
+import { definitions, config as gatheringConfig } from "./gathering/model";
 const initialMotion = (): Motion => ({
   position: { ...worldConfig.spawn },
   facing: 0,
@@ -41,6 +44,22 @@ export default function FreeTowerApp() {
   const motion = useRef<Motion>(initialMotion()),
     ws = useRef<WebSocket | null>(null),
     debug = new URLSearchParams(location.search).get("debug") === "1";
+  const gathering = useGathering(
+    (message) => {
+      if (ws.current?.readyState === WebSocket.OPEN)
+        ws.current.send(JSON.stringify(message));
+    },
+    connected,
+    detail?.room.id,
+  );
+  const serverOffset = useRef(0);
+  useEffect(() => {
+    if (detail?.state.freeTower) gathering.applyState(detail.state.freeTower);
+  }, [detail?.state.freeTower, gathering]);
+  useEffect(() => {
+    const self = players.find((p) => p.id === user?.id);
+    if (self) gathering.applyPlayer(self, serverOffset.current);
+  }, [players, user?.id, gathering]);
   const perform = async (task: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -132,7 +151,28 @@ export default function FreeTowerApp() {
             attempt = 0;
             setConnected(true);
           }
-        } else if (msg.type === "state")
+        } else if (msg.type === "resource-hit") {
+          gathering.hits[msg.resourceId] = msg;
+          playGatherHit(msg);
+          if (msg.depleted) {
+            const node = gatheringConfig.nodes.find(
+              (n) => n.id === msg.resourceId,
+            );
+            const d = node ? definitions[node.definitionId] : undefined;
+            gathering.note(
+              d
+                ? d.drops
+                    .map((drop) => `+${drop.quantity} ${drop.itemId}`)
+                    .join(" · ")
+                : "Resource gathered",
+            );
+          }
+        } else if (msg.type === "gather-error") {
+          gathering.action = null;
+          gathering.note(msg.message);
+        } else if (msg.type === "state") {
+          serverOffset.current = msg.serverTime - Date.now();
+          gathering.serverOffset = serverOffset.current;
           setDetail((d) =>
             d &&
             d.room.id === roomId &&
@@ -142,7 +182,7 @@ export default function FreeTowerApp() {
               ? { ...d, state: msg.state, serverTime: msg.serverTime }
               : d,
           );
-        else if (msg.type === "chat") setChat((c) => [...c.slice(-5), msg]);
+        } else if (msg.type === "chat") setChat((c) => [...c.slice(-5), msg]);
         else if (msg.type === "roomDeleted") {
           sessionStorage.removeItem("freetower.room");
           setDetail(null);
@@ -203,6 +243,7 @@ export default function FreeTowerApp() {
     <main className="ft-app">
       <div className="ft-world">
         <FreeTowerWorld
+          gathering={gathering}
           players={players}
           selfId={user?.id}
           motion={motion}
@@ -214,6 +255,7 @@ export default function FreeTowerApp() {
       </div>
       {detail ? (
         <>
+          <GatheringHUD controller={gathering} debug={debug} />
           <header className="ft-heading">
             <div className="ft-wordmark">
               <span className="ft-sigil">◇</span> FREE<span>TOWER</span>

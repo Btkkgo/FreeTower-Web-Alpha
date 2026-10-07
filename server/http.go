@@ -18,6 +18,7 @@ import (
 )
 
 type RuntimeRoom struct {
+	gatherUsers map[string]*gatheringUser
 	deleted     bool
 	mu          sync.Mutex
 	record      RoomRecord
@@ -444,6 +445,14 @@ func (a *App) runTicker() {
 					continue
 				}
 				at := nowMS()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				if err := rr.respawnGathering(at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
+					log.Printf("resource respawn save failed: %v", err)
+				}
+				cancel()
+				if rr.expireGatherActions(at) {
+					rr.broadcastPresence()
+				}
 				active := len(rr.clients) > 0
 				rr.tick(at)
 				if active {
