@@ -2,142 +2,120 @@
 
 Baseline: `381d7af5dee3e10b0033de31de16e9003a095da6`.
 Branch: `codex/ft-web-006-staging-deployment`.
-Scope: one staging instance; production launch remains closed.
+Runtime source: `e6f4bc8`; final documentation commit is separate from the deployed runtime SHA.
+Scope: staging only. Production launch remains closed; production Character allowlist remains empty.
 
-## Architecture and authority
+## Architecture and cloud resources
 
-Internet → Railway HTTPS/WSS endpoint → one FreeTower Go service serving Vite `dist/`, REST and websocket → PostgreSQL in the same Singapore region. The target project is `FreeTower-Staging`, environment `staging`, region `asia-southeast1-eqsg3a`. No Pages/R2 split, Redis or horizontal scaling.
+Internet → one Railway HTTPS/WSS origin → one Go server serving Vite production `dist/`, REST and WebSocket → private PostgreSQL. Both services and the database volume are in Singapore `asia-southeast1-eqsg3a`. No Vite development server, Pages/R2 split, Redis, scaling or GitHub auto-deploy.
 
-Vite's optimized production **build mode** is used for the static bundle, as requested. Character authority belongs to the server's **deployment environment**, not the JavaScript build mode. The exact staging acceptance inscription is `812e807292195582243f7370fde8155dd1e21ff6cb9841bc1cf543a2c0859f92i0`. It is neither a production character nor a production allowlist member. Staging acceptance requires explicit configuration, real UniSat ownership matching the authenticated Fractal-mainnet wallet, and the normal verified `.fb` selection flow. Staging identities must be labelled and environment scoped. Production must ignore staging config and reject staging identities.
-
-## Deployment record
-
-| Item | Observed state |
+| Resource | Verified value |
 | --- | --- |
-| Railway CLI | npm-executed official `@railway/cli`, version 5.63.4; unauthenticated at preflight |
-| Railway Dashboard | Login required; user handoff requested |
-| Account plan / current usage | NOT VERIFIED |
-| Project / environment / services | NOT CREATED by this task yet |
-| Service / PostgreSQL region | Target Singapore; remote placement NOT VERIFIED |
-| Public URL / HTTPS / WSS | NOT RUN |
-| Docker build | Local Docker unavailable; remote build NOT RUN |
-| Public wallet / Fractal / BIP-322 / replay | NOT RUN |
-| Public ordinal / yihoon.fb / staging identity / game entry | NOT RUN |
-| Restart and Railway PostgreSQL persistence | NOT RUN |
-| Backup schedule / restore drill | NOT VERIFIED / NOT RUN |
+| Project | FreeTower-Staging · `35fa2b1d-b27c-47ed-8d71-06731c320e57` |
+| Environment | staging · `a214d06e-011f-4f34-ae83-34dfba274e47` |
+| Game Server | `a0837999-6c62-4ee3-a782-ea6c123d8dea`, one replica |
+| PostgreSQL | `8100c9ba-86ad-4bf1-8e14-faa4f64a1f15`, PostgreSQL 16.15, private connection |
+| Volume | `4e5c3979-0ff9-4590-b672-d3de924ca5ad`, 500 MB, `/var/lib/postgresql/data` |
+| PostgreSQL deployment | `1fff6b3f-c20e-444b-8575-f9f242e46025`, retained throughout app maintenance |
+| Public URL | <https://game-server-staging-7a18.up.railway.app/> |
+| Plan | Existing HOBBY; no upgrade |
+| Default production environment | No service or volume instances; no production deployment |
 
-Do not replace any NOT RUN above with localhost or unit-test evidence. Deployment must wait until build, frontend, Go race, PostgreSQL integration and vet gates pass.
+The multi-stage Dockerfile uses Node 24, Go 1.26 and a non-root Alpine runtime with CA certificates. It copies the four shared game-definition JSON files into the frontend stage. No node_modules, local save, .env or provider credential goes into the runtime image. Dynamic `PORT` and static `dist/` serving work; public mode fails startup if the required database or canonical HTTPS origin is absent. Schema initialization is idempotent and does not erase saved rooms.
 
-## Configuration
+## Official Railway configuration migration
 
-Environment variable **names only** (secret values belong exclusively in Railway Variables):
+Executed official CLI 5.63.4 `railway config migrate --service 'Game Server' --show`, then `--apply`, reviewed the generated TypeScript and plan, and applied the plan during a stopped-app maintenance window. The single authoritative configuration is `.railway/railway.ts` using official `railway/iac`; old `railway.json` was removed and there is no railway.toml. Migration status confirms no staging service reads old Config as Code.
 
-- `FREETOWER_ENV`
-- `FREETOWER_PUBLIC_ORIGIN`
-- `FREETOWER_REQUIRE_DATABASE`
-- `FREETOWER_GIT_SHA`
-- `FREETOWER_STAGING_CHARACTER_INSCRIPTION_ID`
-- `DATABASE_URL`
-- `UNISAT_FRACTAL_API_KEY`
-- `PORT`
-- `STATIC_DIR`
+The partial owns only Game Server and explicitly rejects non-staging environments. Equivalent settings were verified against the former JSON and the actual deployment manifest: Dockerfile builder, Singapore one replica, `/api/health`, 120-second health timeout, ON_FAILURE with three retries, 120-second drain, zero overlap and sleeping disabled. Database reference remains `${{Postgres.DATABASE_URL}}`; other cloud-held configuration/secrets use `preserve()`. Fingerprint comparison of all 23 existing variables passed without printing values. PostgreSQL remains outside this service partial and unchanged.
 
-Configure `DATABASE_URL` as a Railway reference to the PostgreSQL service. Keep the production character allowlist empty. Do not set any secret under a `VITE_` prefix. Obtain the actual Railway HTTPS domain before setting the public origin and creating wallet challenges. App and database must both use Singapore, with one app replica and no plan upgrade.
+CLI plan still renders null-to-default changes for replica/restart/sleep after apply, although the actual deployed manifest contains the intended values. This is recorded as plan/default normalization noise, not proof of lost runtime configuration. Do not repeatedly apply such a plan or recreate resources. Official reference: [Railway IaC migration](https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code).
 
-## Runtime validation
+Environment variable names: `FREETOWER_ENV`, `FREETOWER_PUBLIC_ORIGIN`, `FREETOWER_REQUIRE_DATABASE`, `FREETOWER_GIT_SHA`, `FREETOWER_STAGING_CHARACTER_INSCRIPTION_ID`, `DATABASE_URL`, `UNISAT_FRACTAL_API_KEY`, `PORT`, `STATIC_DIR`, `FT_CHARACTER_INSCRIPTION_ALLOWLIST`, `FT_ENABLE_DEV_IDENTITY`, `FT_ENABLE_LEGACY_AUTH`, `FT_ENABLE_OWNERSHIP_ACCEPTANCE`. Secret values live only in Railway Variables, never under VITE_ or in Git.
 
-Runtime foundation is implemented and covered by local tests. Public environments require PostgreSQL and an exact HTTPS origin; obvious loopback/private/internal hostnames are rejected. Missing database configuration fails before opening a JSON store. Health exposes database connectivity, environment and a validated seven-character commit. Origin guards reject missing or mismatched origins on public mutation and websocket paths. Public identity cookies enforce Secure, HttpOnly and SameSite=Lax; legacy/DEV/local acceptance are forced off.
+## Identity and production boundary
 
-Static serving and dynamic PORT behavior are retained. The database schema uses idempotent creation/alter statements without clearing state. Shutdown stops the ticker, closes clients, drains websocket handlers and saves rooms before DB close. Startup uses the FreeTower name; runtime failures omit raw provider/database error details.
+The reserved staging inscription is `812e807292195582243f7370fde8155dd1e21ff6cb9841bc1cf543a2c0859f92i0`. It is not a Production Character, Alpha Character or production allowlist member. Only canonical staging with this exact configuration can admit it, after real UniSat Fractal owner matching and normal verified .fb selection. Production ignores staging configuration and rejects staging identities. A Vite production build is not a production server environment.
 
-CSP allows same-origin resources, the configured WSS endpoint, existing Google Fonts, and the data/blob image/worker resources needed by the client. Frame policy is DENY with frame-ancestors none; nosniff and referrer policy are present. Provider HTTP/context timeouts remain bounded. Existing challenge/verify/game/chat limits remain, with an additional public API limiter. The new limiter uses socket peer addresses, so Railway proxy pooling may share a budget; actual multi-client behavior remains a public acceptance check.
+Native Chrome with real UniSat completed Fractal Bitcoin mainnet connection, origin-bound BIP-322 sign-in, server verification, test ordinal ownership, yihoon.fb verification and selection, then game entry. UI displayed `Staging Test Character · yihoon.fb`; authenticated API reported real `unisat-fractal-satsnames`, dev false and environment staging. PostgreSQL contained one staging identity and zero production identities. The .fb implementation was not modified. Addresses, cookies and signatures are omitted from evidence.
 
-These are code/local-test results; live proxy, TLS/cookie, CSP, Docker and graceful redeploy behavior still require Railway evidence.
+Real Cookie flags were inspected in native Chrome: Secure, HttpOnly and SameSite=Lax. No third-party origin or permissive CORS was introduced. Public legacy login, DEV wallet and local ownership-acceptance routes return 403; missing/wrong Origin is rejected. Missing-cookie WSS returns 401; wrong-Origin WSS returns 403. Real authenticated TLS WSS upgrade returned 101. Two WSS connections for the same real identity received a chat broadcast. Independent-wallet multiplayer remains PARTIAL; a second wallet was not fabricated.
 
-## Public acceptance matrix
+Replay rejection passes automated identity tests; a captured real public signature replay is NOT RUN. Routine wallet unlock remains a user action, and a locked wallet never falls back to mock identity.
 
-| Area | Required checks | Status |
-| --- | --- | --- |
-| Delivery | HTTPS HTML, JS/CSS/assets 200, no 404, health/database/version | NOT RUN |
-| Identity | UniSat detection, Fractal mainnet, BIP-322, replay rejection | NOT RUN |
-| Authority | Real test ordinal owner; yihoon.fb reverse/forward/ownership; staging identity | NOT RUN |
-| Entry | Real game entry, one real WSS connection, no DEV/legacy route | NOT RUN |
-| Movement | Walk, run, jump, swim, reload | NOT RUN |
-| Resources | Tree, rock, hand switching | NOT RUN |
-| Construction | Campfire placement/completion/move | NOT RUN |
-| Life | Fish; farm plot, plant, water, harvest; chicken | NOT RUN |
-| Social | Chat; dual sessions if available (one wallet may remain PARTIAL) | NOT RUN |
-| Persistence | World/character/resources/crops/animals/survival before and after app-only restart | NOT RUN |
-| Recovery | Reauthentication and WSS reconnect after restart; DB not recreated | NOT RUN |
-| Diagnostics | Console fatal errors, server errors/secrets, transfer sizes and performance | NOT RUN |
+## Gameplay and jitter
 
-## Backup, performance and cost
+Public browser observed walking/click movement, swimming, camera rotation/reset, hand/tool selection, tree gathering, feeding a chicken and collecting an egg, catching Coastal Snapper, and eating a carrot. Public authenticated WSS protocol acceptance additionally verified rock gathering, building a campfire with gathered resources, its construction timer and move, building a farm plot, till/plant/water/grow/harvest, drinking water and chat. Protocol operations used the actual browser-authenticated cookie over the public endpoint and retained all server ownership/range/cost/cooldown checks. They are distinct from browser-UI acceptance.
 
-[Backup runbook](STAGING_BACKUP.md) covers private logical dumps, isolated restore verification and recovery. Dashboard entitlement/schedule must be recorded rather than assumed.
+Final checkpoint: campfire at x=5,z=17, rotation π/6; farm plot at x=4,z=25, tilled after harvest; shared wood=0/stone=1; personal wheat=3, egg=1, Coastal Snapper=1, carrot=2, bait=17, wheat seed=4, water flask=4, chicken feed=4. Four chickens and their feed/egg history remain stored. Early helper attempts correctly received cooldown and invalid-rotation errors; the helper was corrected to wait 700 ms and send radians. Server validation was not weakened.
 
-Record actual plan, app and database resource limits, current/estimated usage from the dashboard after authorization. No cost estimate is established by this local preparation; no cloud service was provisioned and no plan upgrade was performed. No automatic plan upgrade is authorized.
+The reported movement jitter had a concrete reconciliation defect: delayed self-presence was compared with the character's current predicted position, causing rewinds. The deployed fix attaches per-connection move sequences, compares each acknowledgement with its original sent position, applies only actual server corrections to current/pending prediction, and ignores stale/duplicate acknowledgements. Targeted regression tests pass. Final user assessment and sustained native Run/Jump verification remain pending; static screenshots alone do not establish smooth motion.
 
-Performance baseline must distinguish HTML load, JS transfer, asset transfer, time to visible world, API latency, WSS connection time and observed FPS. Local bundle size alone is not public performance evidence. All assets remain bundled with dist; no CDN/storage migration.
+## Persistence, restart and backup
 
-## Evidence and limitations
+SSH inspection succeeded using the user-registered Btkkgo public key. PostgreSQL was not recreated. The first controlled stop/migration/upload retained the staging identity and survival state; the user reauthenticated and re-entered the game. The second maintenance comparison PASS: room/identity hashes, buildings, plots, resource-node hash, animal feed/egg history, shared and personal inventory all match. Health/energy remained 100; hunger and thirst decreased by exactly the expected 328.004 seconds of simulation. Detailed comparisons are in `gameplay-*.json` and `redeploy-persistence-result.json`. Current deployment is `7ba6fa06-377a-47d6-92f5-64c5a5e8ee4d`; public health reports e6f4bc8, database true, environment staging.
 
-Evidence directory: `/Users/btkkgo/.codex/visualizations/2026/10/07/01a11498-da43-7443-8f74-f9737f13bf29/FT-WEB-006`. Public account authentication is currently the deployment blocker. No live public acceptance or closed-alpha readiness is claimed. Existing FT-WEB-005.2 ownership evidence and yihoon.fb PASS are historical local results and must be rerun on staging.
+The second `railway redeploy` attempt rebuilt a source with the old missing-JSON Docker error and failed before starting a container. Recovery used `railway up` from the tested checkout. Do not use ambiguous latest-source redeploy for this service; verify the upload revision and resulting health SHA. The database remained running throughout.
 
-Official references: [Singapore regions](https://docs.railway.com/deployments/regions), [config as code](https://docs.railway.com/config-as-code/reference), [CLI](https://docs.railway.com/cli), [PostgreSQL](https://docs.railway.com/databases/postgresql), [backup and restore](https://docs.railway.com/guides/postgres-backups-restores).
+Manual custom-format pg_dump and isolated transactional restore both PASS, including the latest gameplay archive with one room, two buildings and zero production identities. Dumps are outside Git in a 0700 private directory, mode 0600. Automatic DAILY volume backup is BLOCKED: Railway returned Not Authorized; the schedule is empty and no upgrade/access bypass occurred. See [backup runbook](STAGING_BACKUP.md). An application restart is not itself backup evidence.
 
-## Final local validation (2026-10-08)
+## Maintenance and writer safety
 
-- Frontend: 88/88 PASS, zero skipped or failed; TypeScript/Vite build PASS.
-- Go race suite with real local PostgreSQL disposable schemas: 253 passing test/subtest events, 108 top-level tests, zero failures/skips. Twelve PostgreSQL-backed top-level tests cover building/resource/life/identity/restart/schema, environment isolation, exclusive world ownership, connection/lock loss, active websocket shutdown and final-state handoff. `go vet ./...` PASS.
-- Linux amd64 static server compilation with CGO disabled PASS. Docker image build remains NOT RUN; no local Docker engine exists and Railway authorization is pending.
-- Actual compiled Go executable on a temporary port, canonical staging config and a generated isolated PostgreSQL schema: health reported database connected/environment staging/commit f3fc6fd. All 18 page/config/static-resource requests returned 200, including SPA fallback. Optimized browser identity gate loaded; zero captured warning/error logs. No Vite dev server was used for this check. The temporary server stopped gracefully and its own test schema was removed; the existing localhost wallet server was untouched.
-- Production gate automated regression PASS: staging config ignored outside canonical staging, reserved asset excluded from normal production allowlist, wrong-owner/unconfirmed/provider-error paths fail closed, cross-environment sessions/identities rejected by REST and websocket authority. `.fb` resolver implementation unchanged.
-- Root and worker test logs, local browser screenshot, static HTTP result and task reviews are in the external evidence directory. They do not establish public TLS/WSS or real provider acceptance.
+One replica alone does not prevent overlapping in-memory world writers. Public startup acquires a database/schema-scoped PostgreSQL advisory lock before loading rooms. Its physical session performs all world writes. A competing app fails startup; loss of the session or lock fails closed, stops simulation and closes clients. No pool fallback is permitted. Use the direct PostgreSQL connection, not transaction pooling; do not attach old development binaries to this database.
 
-The local optimized dist contains 15 files totalling 4,876,648 bytes. Largest files: cottage GLB 1,677,316 bytes; Three.js bundle 1,508,694 bytes (Vite gzip estimate 487.83 kB); inventory atlas 525,176 bytes; neighbors atlas 442,242 bytes; pasture art 339,330 bytes. Actual public transfer encoding, time to world, API/WSS latency and FPS remain NOT RUN.
+1. Verify project/environment/service identifiers and passing test/build gates; capture a sanitized checkpoint.
+2. Stop only Game Server and wait for `deploymentStopped=true`; PostgreSQL and volume stay running.
+3. Upload the tested checkout using `railway up -s 'Game Server' -e staging --detach` only after the old process stops. Configuration apply can trigger a deployment: stop and verify that deployment too before a subsequent upload.
+4. Verify actual deployment manifest, health SHA/environment/database, persistent state, reauthentication and WSS. Accept maintenance downtime including build time.
 
-## Compatibility and remaining acceptance
+Go drains HTTP, stops ticker/client work, saves rooms and closes the store on SIGTERM. Local PostgreSQL tests cover active websocket shutdown/final-state handoff. Cloud SIGTERM and stopped status were observed; the second browser session was locked/disconnected before stop, so no public active-client close-frame claim is made. Infrastructure-initiated overlapping replacement may fail closed and require recovery; seamless availability is not claimed.
 
-Pre-environment identity records remain stored but fail closed. Reauthentication and selection create an explicitly scoped identity; old world memberships are not automatically migrated. No database rows or saves were deleted by implementation. A newly provisioned staging database starts with its own identities/worlds.
+## Security and reliability
 
-Final review corrections set explicit Railway draining, add PostgreSQL exclusive world-writer protection, and cover connected-websocket shutdown and ownership loss. Final race/PostgreSQL tests pass; actual cloud handover remains unverified. Actual public WSS/redeploy/persistence is still mandatory before closed-alpha readiness. Railway proxy pooling may share the socket-address rate limit between users and must be observed in public multi-client acceptance.
+CSP supports same-origin assets/WSS and existing Google Fonts; frame-ancestors none, X-Frame-Options DENY, nosniff and Referrer-Policy are set. Real world rendering and injected wallet flow succeeded. Public API limit is 180/minute by socket peer; wallet challenge 30/5 minutes, verify 60/5 minutes; game/action, building/gathering/life cooldowns and chat interval remain enforced. Proxy pooling may share peer-address budgets; multi-client capacity is unvalidated.
 
-**NOT READY FOR CLOSED ALPHA:** Railway Dashboard/CLI authorization is outstanding. Project/services/URL/Docker image, public identity/gameplay, app redeploy persistence, backups, current plan/cost and public performance have not been verified. The next operator step is completing authorized Railway login, then deploying this tested branch and executing the public matrix above. Production launch remains closed.
+Provider HTTP timeout is 8 seconds with a 12-second options context. Health has bounded database checks and returns only ok/database/environment/short commit. Startup log says FreeTower. Go's normal stderr startup line is tagged error by Railway ingestion; it is not itself a runtime exception. Logs must never expose provider secrets, wallet addresses, signatures, cookies or DB URLs.
 
-## Mandatory staging maintenance deployment procedure
+## Validation, performance and cost
 
-The app owns authoritative rooms in process memory. **One configured replica does not make rolling replacement safe:** the new process can load a room before the old process completes its final save. Do not use normal rolling redeploy or GitHub auto-deploy for this staging service. Keep its GitHub source/autodeploy disconnected, use controlled CLI uploads, and disable additional deployment automation. No second Go writer may run against this database during planned maintenance.
+Fresh frontend suite: 93/93 PASS, zero failed/skipped. TypeScript/Vite production build PASS. Uncached Go race run: 254 passing test/subtest events, 109 top-level, zero failed/skipped, including 12 PostgreSQL-backed top-level tests. `go vet ./...` PASS. Production gate tests reject staging assets/identities outside canonical staging and wrong-owner/provider-failure paths remain closed. Targeted movement sequence/reconciliation tests pass. No code changed after these gates; final changes are documentation/evidence.
 
-1. Verify the exact FreeTower-Staging project, staging environment, application service and PostgreSQL service identifiers. Complete all local test/build gates before service interruption. Capture a sanitized persistence checkpoint.
-2. Stop only the current **application deployment**. Leave PostgreSQL and its volume running. Wait until Railway shows that app deployment Removed/stopped and its process has completed shutdown; a submitted stop request alone is not evidence. Do not delete the service, project, environment, database or volume.
-3. Only after the old application is stopped, upload/start the tested app revision. Its room load now follows completion of the previous process's final writes. This staging procedure deliberately accepts maintenance downtime, including build time.
-4. Verify health/environment/commit/database, reauthenticate the real wallet, reconnect WSS, and compare the saved world/identity checkpoint. Record the stop/start deployment IDs and PostgreSQL service/volume IDs unchanged.
+Optimized static assets are bundled in dist. Public HTML, JS/CSS, GLB/images and SPA fallback were fetched successfully with verified TLS. Final public transfer samples: HTML 493 bytes/0.898 s; Three.js encoded response 493,968 bytes/0.702 s; cottage GLB 1,677,316 bytes/1.270 s; inventory atlas 525,176 bytes/0.604 s. All 18 final page/API/asset requests returned 200, with 3,602,761 bytes across the enumerated JS/CSS/art/model transfers. These are individual requests on this connection, not page-load totals. Approximate raw dist is 4.88 MB. Browser debug FPS observed roughly 60–122; no controlled benchmark or precise time-to-visible-world was captured. Real server-side identity requests were approximately 0.65–1.27 s. WSS upgrade succeeded; accurate handshake latency was not separately recorded.
 
-`railway.json` supplies a 120-second draining window and zero additional overlap. The 120 seconds allows the 15-second HTTP drain plus normal staging ticker/client/final-save work; it is not a proof of shutdown under arbitrary room counts or a stalled database. Confirm the effective setting in Railway and measure actual active-client shutdown. The [Railway teardown reference](https://docs.railway.com/deployments/deployment-teardown) and [deployment reference](https://docs.railway.com/deployments/reference) explain that the default termination grace is zero.
+Existing Hobby plan is $5/month including $5 resource usage ([official pricing](https://docs.railway.com/pricing/plans)); overage depends on actual use. CLI partial-period observation: project $0.0032603, Game Server $0.0021096, Postgres $0.0011508. Metering lag and the short partial period make a monthly forecast unreliable. Both services are one Singapore replica; volume 500 MB; no plan upgrade. No fixed monthly usage promise is made.
 
-**Exclusive world writer:** public startup acquires a PostgreSQL advisory lock scoped to the database/schema before loading rooms. The physical connection holding that lock also executes every world save/delete; it is serialized and never falls back to the connection pool. A concurrent app cannot acquire world ownership and fails startup. The owner holds its lock through shutdown final saves and releases it when the store closes. Loss of the connection or actual lock fails world access closed, stops simulation and closes clients; health also checks this ownership.
+## Evidence and remaining limits
 
-Railway can initiate infrastructure replacements itself. A replacement that overlaps the existing owner now fails startup instead of becoming a second durable world writer. This prioritizes state safety over seamless availability; provider-managed replacement/retry behavior remains a live acceptance check, and controlled stop/drain/start is still the supported staging deployment procedure. One replica or zero overlap alone is not the safety mechanism. No scaling/distributed room execution is introduced.
+Evidence: `/Users/btkkgo/.codex/visualizations/2026/10/07/01a11498-da43-7443-8f74-f9737f13bf29/FT-WEB-006`. Scope labels distinguish automated tests, public browser observations, authenticated public WSS protocol acceptance and SSH database evidence.
 
-## Exact file inventory
+Remaining acceptance: UniSat is currently auto-locked and awaits the user; final native Run/Jump and sustained jitter assessment, a captured real replay rejection, final unlocked-wallet re-entry after the second restart, and authenticated-game console inspection. Multiplayer uses one wallet only. Automatic backup schedule is not enabled. Build logs report a high-severity source-map-js advisory in the build chain; no Node dependencies are installed in the final runtime image. IaC plan has default-normalization noise. Browser/host automation has a canvas coordinate mismatch, so protocol checks are not labelled full UI acceptance.
 
-Created (10):
+NOT READY FOR CLOSED ALPHA until remaining public browser checks are resolved. No FT-WEB-007 work and no Production Launch.
 
-- `railway.json`
+## Exact file inventory relative to baseline
+
+Created (13):
+
+- `.railway/railway.ts`
+- `docs/freetower/FT-WEB-006-STAGING-DEPLOYMENT.md`
+- `docs/freetower/STAGING_BACKUP.md`
+- `docs/superpowers/plans/2026-10-08-freetower-staging.md`
 - `server/identity_staging_test.go`
+- `server/movement_sequence_test.go`
 - `server/runtime_config.go`
 - `server/runtime_config_test.go`
 - `server/runtime_shutdown_test.go`
 - `server/world_writer.go`
 - `server/world_writer_test.go`
-- `docs/freetower/FT-WEB-006-STAGING-DEPLOYMENT.md`
-- `docs/freetower/STAGING_BACKUP.md`
-- `docs/superpowers/plans/2026-10-08-freetower-staging.md`
+- `src/world/freetower/movement-reconciliation.ts`
+- `tests/movement-reconciliation.test.ts`
 
-Modified (17):
+Modified (22):
 
 - `.dockerignore`
 - `Dockerfile`
+- `package-lock.json`
+- `package.json`
 - `server/auth.go`
 - `server/http.go`
 - `server/identity.env.example`
@@ -147,15 +125,14 @@ Modified (17):
 - `server/identity_selection.go`
 - `server/identity_store.go`
 - `server/main.go`
+- `server/model.go`
 - `server/store.go`
 - `server/websocket.go`
+- `src/game/types.ts`
 - `src/identity/IdentityGate.tsx`
 - `src/identity/model.ts`
 - `src/identity/types.ts`
+- `src/world/freetower/FreeTowerApp.tsx`
 - `tests/identity.test.ts`
 
-## Final integrity checks
-
-Scoped secret scan PASS: tracked/untracked nonignored source, optimized dist, stage diff and textual stage evidence contain neither the configured provider secret nor the current real full wallet address; private-key marker scan also clean. Values are compared only in memory and never printed or saved by the scanner. This is not an audit of all historical Git credentials. `git diff --check` PASS. No cloud credentials or database dump were committed.
-
-The PostgreSQL endpoint must preserve a physical session for session advisory locks: use Railway's direct PostgreSQL connection, not transaction/statement-pooling middleware. Every app that writes this database must run the guarded public-mode build; do not attach development/legacy binaries or roll back to pre-guard code against this staging data. A failed owner is replaced through the controlled deployment procedure, never silently reconnected. Final scoped code review is APPROVED after these guard/drain corrections. The compiled-server smoke was rerun on f3fc6fd: database connected, environment staging, all 18 requests 200; browser warning/error log empty; clean termination and own-schema cleanup confirmed.
+The intermediate railway.json was removed during migration and is absent from the final tree. Scoped secret scan and git diff --check PASS. The temporary real browser-session file was deleted after protocol acceptance and its in-memory browser binding cleared. No credential, session file or database dump is included in Git.

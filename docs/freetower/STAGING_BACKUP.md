@@ -4,7 +4,18 @@ This runbook applies only to `FreeTower-Staging` / `staging`. A successful appli
 
 ## Railway status
 
-Account inspection is pending Railway login. PostgreSQL service, backup schedule, retention, last completed backup, volume size, plan entitlement and restore drill are **NOT VERIFIED**. Do not assume backups are enabled. Record actual dashboard values in the deployment report after login; do not upgrade the plan automatically.
+On 2026-10-08 the account remained HOBBY, with PostgreSQL 16.15 and a 500 MB Singapore volume. The backup schedule was empty; enabling DAILY returned `Not Authorized`. Automatic backup remains BLOCKED, with no plan upgrade or permission bypass. The user registered SSH key Btkkgo, and authorized SSH inspection and logical backup succeeded.
+
+Two custom-format pg_dump archives were restored into separate local PostgreSQL 16.13 scratch databases using `--single-transaction --exit-on-error`, then the agent-created scratch databases were removed. Latest archive: `freetower-staging-20261008T050049Z.dump`, 9,517 bytes, SHA256 `6773eb7363fcf5a650a7148c28fcf09fb7a3b5034d08387c1dac711288bd0f40`. Restore verified one room, two buildings and zero production identities. Earlier restore also verified one staging identity. Archives are outside Git in `/Users/btkkgo/Documents/FreeTower-Staging-Backups` (directory 0700, archive 0600). These are manual verified logical backups, not an enabled recurring backup service. This drill did not replace the cloud database or claim a full application-level disaster recovery exercise.
+
+Actual SSH dump uses the server's matching PostgreSQL client without exposing a database URL:
+
+```sh
+umask 077
+npm exec --yes --package=@railway/cli -- railway ssh -s Postgres -e staging 'pg_dump -U postgres -d railway --format=custom --no-owner --no-privileges' > "$FT_BACKUP_FILE"
+```
+
+Check successful exit and `PGDMP` archive format before calling a dump valid. Keep backups and restore manifests private.
 
 Railway exposes volume snapshots and, for eligible configurations, PostgreSQL point-in-time recovery. Check the service's Backups tab. Volume restore is limited to the same project/environment. The specific volume-backup reference says the original volume is retained unmounted and newer backups stay there; the general PostgreSQL guide still contains conflicting wording about newer backups. Verify the staged volumes and retained backups in the actual Dashboard before any explicitly approved recovery; this runbook does not assume deletion or retention has been observed. See [Railway backup guide](https://docs.railway.com/guides/postgres-backups-restores) and [volume backup reference](https://docs.railway.com/volumes/backups). Scheduled backups can incur storage usage; enabling must stay within the user's existing plan authorization.
 
