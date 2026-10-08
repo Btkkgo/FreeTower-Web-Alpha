@@ -20,6 +20,7 @@ import type {
 } from "../../game/types";
 import FreeTowerWorld, { type Motion, type Readout } from "./World";
 import { locomotionAt, movePayload, worldConfig } from "./model";
+import { MovementReconciler } from "./movement-reconciliation";
 import "./freetower.css";
 import { playGatherHit } from "./gathering/audio";
 import GatheringHUD, { useGathering } from "./gathering/GatheringHUD";
@@ -47,6 +48,7 @@ export default function FreeTowerApp({ identityUser, onIdentityDisconnect, onIde
     [chat, setChat] = useState<Chat[]>([]),
     [readout, setReadout] = useState<Readout | null>(null);
   const motion = useRef<Motion>(initialMotion()),
+    movementReconciler = useRef(new MovementReconciler()),
     ws = useRef<WebSocket | null>(null),
     debug = new URLSearchParams(location.search).get("debug") === "1";
   const gathering = useGathering(
@@ -148,6 +150,7 @@ export default function FreeTowerApp({ identityUser, onIdentityDisconnect, onIde
     const connect = () => {
       if (disposed) return;
       spawned = false;
+      movementReconciler.current = new MovementReconciler();
       setConnected(false);
       const socket = new WebSocket(
         `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/rooms/${roomId}/ws?world=freetower`,
@@ -178,13 +181,12 @@ export default function FreeTowerApp({ identityUser, onIdentityDisconnect, onIde
                 ...locomotionAt(self.position),
               };
               spawned = true;
-            } else if (
-              Math.hypot(
-                self.position.x - motion.current.position.x,
-                self.position.z - motion.current.position.z,
-              ) > 2
-            ) {
-              motion.current.position = { ...self.position };
+            } else {
+              motion.current.position = movementReconciler.current.reconcile(
+                self.position,
+                self.moveSequence,
+                motion.current.position,
+              );
             }
             attempt = 0;
             setConnected(true);
@@ -266,8 +268,10 @@ export default function FreeTowerApp({ identityUser, onIdentityDisconnect, onIde
     };
   }, [detail?.room.id, user?.id]);
   const sendMove = useCallback((m: ReturnType<typeof movePayload>) => {
-    if (ws.current?.readyState === WebSocket.OPEN)
-      { life.networkOut++; ws.current.send(JSON.stringify(m)); }
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      life.networkOut++;
+      ws.current.send(JSON.stringify(movementReconciler.current.packet(m)));
+    }
   }, []);
   const submitAuth = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

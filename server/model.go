@@ -200,6 +200,7 @@ type Action struct {
 	UpgradeID     string `json:"upgradeId,omitempty"`
 }
 type Player struct {
+	MoveSequence        uint64 `json:"moveSequence"`
 	CharacterIdentityID string `json:"characterIdentityId,omitempty"`
 	BtcName             string `json:"btcName,omitempty"`
 	CharacterAssetID    string `json:"characterAssetId,omitempty"`

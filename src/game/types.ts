@@ -146,6 +146,7 @@ export interface RoomDetail {
   serverTime: number;
 }
 export interface Player {
+  moveSequence?: number;
   characterIdentityId?: string;
   btcName?: string;
   characterAssetId?: string;

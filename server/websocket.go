@@ -237,17 +237,18 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 				}
 			}
 			var msg struct {
-				Type       string    `json:"type"`
-				Hands      HandState `json:"hands"`
-				ResourceID string    `json:"resourceId"`
-				ToolID     string    `json:"toolId"`
-				ActionID   string    `json:"actionId"`
-				Position   Vec2      `json:"position"`
-				Facing     float64   `json:"facing"`
-				Jump       bool      `json:"jump"`
-				Moving     bool      `json:"moving"`
-				Running    bool      `json:"running"`
-				Text       string    `json:"text"`
+				Type         string    `json:"type"`
+				MoveSequence uint64    `json:"moveSequence"`
+				Hands        HandState `json:"hands"`
+				ResourceID   string    `json:"resourceId"`
+				ToolID       string    `json:"toolId"`
+				ActionID     string    `json:"actionId"`
+				Position     Vec2      `json:"position"`
+				Facing       float64   `json:"facing"`
+				Jump         bool      `json:"jump"`
+				Moving       bool      `json:"moving"`
+				Running      bool      `json:"running"`
+				Text         string    `json:"text"`
 			}
 			if json.Unmarshal(b, &msg) != nil {
 				return false
@@ -345,6 +346,9 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 				}
 				rr.mu.Unlock()
 			case "move":
+				if msg.MoveSequence > 9007199254740991 || c.player.MoveSequence != 0 && msg.MoveSequence <= c.player.MoveSequence {
+					return false
+				}
 				now := time.Now()
 				dt := now.Sub(lastMove).Seconds()
 				if dt < .04 {
@@ -378,6 +382,7 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 				} else {
 					c.player.Position = allowedPosition(&rr.record.State, msg.Position, c.player.Position)
 				}
+				c.player.MoveSequence = msg.MoveSequence
 				c.player.Facing = msg.Facing
 				if msg.Jump && c.player.MovementMode != "swimming" && now.UnixMilli()-c.player.JumpAt >= 650 {
 					c.player.JumpAt = now.UnixMilli()
