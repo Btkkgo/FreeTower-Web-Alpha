@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import FreeTowerApp from '../world/freetower/FreeTowerApp';
 import { identityAPI, IdentityAPIError } from './api';
-import { IdentityAttempt, verifyWallet } from './model';
+import { IdentityAttempt, verifyWallet, characterAssetLabel } from './model';
 import { IdentityLifecycle, checkedWalletConnection } from './lifecycle';
 import { recoverUnauthorized } from './recovery';
 import { FRACTAL_CHAIN, UniSatWalletAdapter } from './wallet/UniSatWalletAdapter';
@@ -147,7 +147,7 @@ export default function IdentityGate() {
     return <><div className="ft-identity-mode">DEV · LEGACY MIGRATION</div>{query.get('experience')==='little-flock'?<Suspense fallback={<p>Loading…</p>}><LegacyApp/></Suspense>:<FreeTowerApp/>}</>;
   }
   if(session?.user&&session.identity?.status==='active'){
-    return <><div className="ft-identity-mode">{session.dev?'DEV ACCEPTANCE · ':''}{session.identity.btcName}<button onClick={()=>void disconnect()}>Disconnect</button></div><FreeTowerApp key={session.user.id} identityUser={session.user} onIdentityDisconnect={disconnect} onIdentityRevoked={()=>revoke('Session expired or revoked. Authenticate again.')}/></>;
+    return <><div className="ft-identity-mode">{session.identity.stagingTestCharacter?'Staging Test Character · ':session.dev?'DEV ACCEPTANCE · ':''}{session.identity.btcName}<button onClick={()=>void disconnect()}>Disconnect</button></div><FreeTowerApp key={session.user.id} identityUser={session.user} onIdentityDisconnect={disconnect} onIdentityRevoked={()=>revoke('Session expired or revoked. Authenticate again.')}/></>;
   }
   return <main className="ft-identity-entry"><section className="ft-identity-card">
     <p className="ft-identity-eyebrow">A WORLD BEFORE CIVILIZATION</p><h1>FREE<span>TOWER</span></h1>
@@ -165,7 +165,7 @@ export default function IdentityGate() {
       <p className="ft-verified">Wallet verified ✓ {session.dev?'· DEV':''}</p>
       {!options?<p>Loading eligible assets and names…</p>:<>
         <h2>Choose your character</h2>
-        {options.assets.length===0?<p role="status">No eligible Character asset found</p>:<div className="ft-character-options">{options.assets.map(a=>{const id=a.assetId||a.inscriptionId;return <button key={id} className={asset===id?'selected':''} aria-pressed={asset===id} onClick={()=>setAsset(id)} disabled={busy}><span className="ft-character-preview" aria-hidden="true">♙</span><strong>Character</strong><small>{short(a.inscriptionId)}</small><small>{a.status||'eligible'} · Placeholder preview</small></button>})}</div>}
+        {options.assets.length===0?<p role="status">No eligible Character asset found</p>:<div className="ft-character-options">{options.assets.map(a=>{const id=a.assetId||a.inscriptionId;return <button key={id} className={asset===id?'selected':''} aria-pressed={asset===id} onClick={()=>setAsset(id)} disabled={busy}><span className="ft-character-preview" aria-hidden="true">♙</span><strong>{characterAssetLabel(a)}</strong><small>{short(a.inscriptionId)}</small><small>{a.status||'eligible'} · Placeholder preview</small></button>})}</div>}
         <h2>Your public name</h2>
         {options.names.length===0?<p role="status">No eligible .fb name found</p>:<label className="ft-name-select">Owned .fb<select value={name} onChange={e=>setName(e.target.value)} disabled={busy}>{options.names.map(n=><option key={n.name} value={n.name}>{n.name}</option>)}</select></label>}
         <button className="ft-identity-primary" disabled={busy||!asset||!name} onClick={()=>void select()}>Enter FreeTower</button>

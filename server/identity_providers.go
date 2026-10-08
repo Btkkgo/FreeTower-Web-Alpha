@@ -64,9 +64,10 @@ func providerJSON(ctx context.Context, c *http.Client, endpoint, key string, out
 }
 
 type UniSatFractalOrdinalsProvider struct {
-	http  *http.Client
-	key   string
-	allow map[string]bool
+	stagingID string
+	http      *http.Client
+	key       string
+	allow     map[string]bool
 }
 type inscriptionRecord struct {
 	Metadata    json.RawMessage `json:"metadata"`
@@ -84,7 +85,7 @@ func (p *UniSatFractalOrdinalsProvider) get(ctx context.Context, path string, ou
 	return providerJSON(ctx, p.http, "https://open-api-fractal.unisat.io"+path, p.key, out)
 }
 func (p *UniSatFractalOrdinalsProvider) info(ctx context.Context, id string) (*inscriptionRecord, error) {
-	if !p.allow[id] || !inscriptionIDPattern.MatchString(id) {
+	if !p.eligible(id) || !inscriptionIDPattern.MatchString(id) {
 		return nil, nil
 	}
 	var out struct {
@@ -116,7 +117,7 @@ func (p *UniSatFractalOrdinalsProvider) VerifyOwnership(ctx context.Context, add
 }
 func (p *UniSatFractalOrdinalsProvider) GetOwnedCharacterAssets(ctx context.Context, address string) ([]CharacterAsset, error) {
 	result := []CharacterAsset{}
-	if len(p.allow) == 0 {
+	if len(p.allow) == 0 && p.stagingID == "" {
 		return result, nil
 	}
 	seen := map[string]bool{}
@@ -149,7 +150,7 @@ func (p *UniSatFractalOrdinalsProvider) GetOwnedCharacterAssets(ctx context.Cont
 				return nil, errProvider
 			}
 			seen[v.ID] = true
-			if !p.allow[v.ID] {
+			if !p.eligible(v.ID) {
 				continue
 			}
 			info, e := p.info(ctx, v.ID)
@@ -166,7 +167,7 @@ func (p *UniSatFractalOrdinalsProvider) GetOwnedCharacterAssets(ctx context.Cont
 			if owner != address {
 				continue
 			}
-			result = append(result, CharacterAsset{InscriptionID: v.ID, AssetID: v.ID, Owner: owner, ContentType: info.ContentType, Metadata: safeAssetMetadata(info.Metadata), Collection: safeAssetMetadata(info.Collection), Status: "eligible"})
+			result = append(result, CharacterAsset{StagingTestCharacter: info.ID == p.stagingID && p.stagingID != "", InscriptionID: v.ID, AssetID: v.ID, Owner: owner, ContentType: info.ContentType, Metadata: safeAssetMetadata(info.Metadata), Collection: safeAssetMetadata(info.Collection), Status: "eligible"})
 		}
 		cursor += len(out.Data.Items)
 		if cursor == expected {
@@ -256,4 +257,11 @@ func safeAssetMetadata(raw json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return raw
+}
+
+func (p *UniSatFractalOrdinalsProvider) eligible(id string) bool {
+	if id == stagingCharacterInscriptionID {
+		return p.stagingID == stagingCharacterInscriptionID
+	}
+	return p.allow[id]
 }

@@ -31,3 +31,7 @@ export function publicCharacterName(value: { btcName?: string; username?: string
   if (value.btcName) return value.btcName;
   return value.characterIdentityId ? 'Explorer' : value.username || 'Explorer';
 }
+
+export function characterAssetLabel(asset: {stagingTestCharacter?: boolean}): string {
+  return asset.stagingTestCharacter ? "Staging Test Character" : "Character";
+}

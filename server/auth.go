@@ -219,7 +219,7 @@ func (a *App) updateProfile(w http.ResponseWriter, r *http.Request) {
 	if u.CharacterIdentityID != "" {
 		_, saveError = a.store.identityState(r.Context(), func(d *identityData) error {
 			i, ok := d.Identities[u.ID]
-			if !ok {
+			if !ok || !a.identity.config.identityAllowed(i) {
 				return errNotFound
 			}
 			i.Avatar = *v

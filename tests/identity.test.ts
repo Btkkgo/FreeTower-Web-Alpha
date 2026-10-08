@@ -25,3 +25,8 @@ test('wallet event while server verification is pending cannot publish the retur
  const stop=f.adapter.onChange(()=>attempt.cancel());const operation=verifyWallet(f.adapter,{challenge:async()=>({nonce:'n',message:'m'}),verify:async()=>{started();return pending;}},attempt);
  await verifying;f.listeners.get('accountsChanged')?.(['B']);resolve({wallet:{address}});await assert.rejects(operation,/changed|cancel/i);stop();
 });
+test('character label follows server staging metadata',async()=>{
+ const {characterAssetLabel}=await import('../src/identity/model.ts');
+ assert.equal(characterAssetLabel({stagingTestCharacter:true}),'Staging Test Character');
+ assert.equal(characterAssetLabel({}),'Character');
+});

@@ -93,7 +93,7 @@ func (a *App) walletChallenge(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	now := time.Now().UTC()
-	c := walletChallenge{Nonce: nonce, Address: address, Origin: r.Header.Get("Origin"), Binding: tokenHash(binding), IssuedAt: now.UnixMilli(), ExpiresAt: now.Add(5 * time.Minute).UnixMilli(), SignatureScheme: signatureScheme}
+	c := walletChallenge{Environment: a.identity.config.Environment, Nonce: nonce, Address: address, Origin: r.Header.Get("Origin"), Binding: tokenHash(binding), IssuedAt: now.UnixMilli(), ExpiresAt: now.Add(5 * time.Minute).UnixMilli(), SignatureScheme: signatureScheme}
 	c.Message = fmt.Sprintf("FreeTower Sign-In\nOrigin: %s\nAddress: %s\nNetwork: %s\nNonce: %s\nIssued At: %s\nExpiration Time: %s\n\nSign only to prove wallet ownership. No transaction or payment is requested.", c.Origin, address, identityNetwork, nonce, now.Format(time.RFC3339), now.Add(5*time.Minute).Format(time.RFC3339))
 	a.identity.mu.Lock()
 	defer a.identity.mu.Unlock()
@@ -142,7 +142,7 @@ func (a *App) walletVerify(w http.ResponseWriter, r *http.Request) {
 	}()
 	c, ok := a.identity.challenges[body.Nonce]
 	cookie, ce := r.Cookie(bindingCookie)
-	if !ok || c.ExpiresAt <= nowMS() || c.Address != address || c.Origin != r.Header.Get("Origin") || ce != nil || tokenHash(cookie.Value) != c.Binding {
+	if !ok || !a.identity.config.environmentMatches(c.Environment) || c.ExpiresAt <= nowMS() || c.Address != address || c.Origin != r.Header.Get("Origin") || ce != nil || tokenHash(cookie.Value) != c.Binding {
 		identityError(w, 401, "invalid_challenge", "Challenge expired, consumed, or does not match this browser; request a new one")
 		return
 	}
@@ -209,7 +209,7 @@ func (a *App) persistWalletSession(w http.ResponseWriter, r *http.Request, addre
 				delete(d.Sessions, k)
 			}
 		}
-		d.Sessions[hash] = walletSession{BootID: a.identity.bootID, TokenHash: hash, WalletID: account.ID, Binding: binding, Network: identityNetwork, ExpiresAt: now + 24*3600*1000}
+		d.Sessions[hash] = walletSession{Environment: a.identity.config.Environment, BootID: a.identity.bootID, TokenHash: hash, WalletID: account.ID, Binding: binding, Network: identityNetwork, ExpiresAt: now + 24*3600*1000}
 		return nil
 	})
 	if e != nil {
@@ -332,7 +332,7 @@ func (a *App) revalidatePrevious(ctx context.Context, w WalletAccount, d identit
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	for id, i := range d.Identities {
-		if i.WalletAccountID != w.ID || i.Status != "active" {
+		if i.WalletAccountID != w.ID || i.Status != "active" || !a.identity.config.identityAllowed(i) {
 			continue
 		}
 		status := ""

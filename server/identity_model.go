@@ -13,6 +13,7 @@ import (
 )
 
 const identityNetwork = "fractal-mainnet"
+const stagingCharacterInscriptionID = "812e807292195582243f7370fde8155dd1e21ff6cb9841bc1cf543a2c0859f92i0"
 const signatureScheme = "bip322-simple"
 
 var errProvider = errors.New("Ownership verification unavailable; retry later")
@@ -28,25 +29,28 @@ type WalletAccount struct {
 	Dev                 bool   `json:"dev,omitempty"`
 }
 type CharacterIdentity struct {
-	ID               string           `json:"id"`
-	WalletAccountID  string           `json:"walletAccountId"`
-	CharacterAssetID string           `json:"characterAssetId"`
-	BtcName          string           `json:"btcName"`
-	CreatedAt        int64            `json:"createdAt"`
-	LastVerifiedAt   int64            `json:"lastVerifiedAt"`
-	Status           string           `json:"status"`
-	Provider         string           `json:"provider"`
-	Dev              bool             `json:"dev,omitempty"`
-	Avatar           AvatarAppearance `json:"avatar"`
+	Environment          string           `json:"environment"`
+	StagingTestCharacter bool             `json:"stagingTestCharacter,omitempty"`
+	ID                   string           `json:"id"`
+	WalletAccountID      string           `json:"walletAccountId"`
+	CharacterAssetID     string           `json:"characterAssetId"`
+	BtcName              string           `json:"btcName"`
+	CreatedAt            int64            `json:"createdAt"`
+	LastVerifiedAt       int64            `json:"lastVerifiedAt"`
+	Status               string           `json:"status"`
+	Provider             string           `json:"provider"`
+	Dev                  bool             `json:"dev,omitempty"`
+	Avatar               AvatarAppearance `json:"avatar"`
 }
 type CharacterAsset struct {
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-	Collection    json.RawMessage `json:"collection,omitempty"`
-	InscriptionID string          `json:"inscriptionId"`
-	Owner         string          `json:"owner"`
-	ContentType   string          `json:"contentType"`
-	AssetID       string          `json:"assetId"`
-	Status        string          `json:"status"`
+	StagingTestCharacter bool            `json:"stagingTestCharacter,omitempty"`
+	Metadata             json.RawMessage `json:"metadata,omitempty"`
+	Collection           json.RawMessage `json:"collection,omitempty"`
+	InscriptionID        string          `json:"inscriptionId"`
+	Owner                string          `json:"owner"`
+	ContentType          string          `json:"contentType"`
+	AssetID              string          `json:"assetId"`
+	Status               string          `json:"status"`
 }
 type BtcNameRecord struct {
 	Name     string `json:"name"`
@@ -64,13 +68,14 @@ type BtcNameResolver interface {
 	VerifyOwnership(context.Context, string, string) (bool, error)
 }
 type walletSession struct {
-	BootID     string `json:"bootId"`
-	Binding    string `json:"binding,omitempty"`
-	TokenHash  string `json:"tokenHash"`
-	WalletID   string `json:"walletId"`
-	IdentityID string `json:"identityId"`
-	ExpiresAt  int64  `json:"expiresAt"`
-	Network    string `json:"network"`
+	Environment string `json:"environment"`
+	BootID      string `json:"bootId"`
+	Binding     string `json:"binding,omitempty"`
+	TokenHash   string `json:"tokenHash"`
+	WalletID    string `json:"walletId"`
+	IdentityID  string `json:"identityId"`
+	ExpiresAt   int64  `json:"expiresAt"`
+	Network     string `json:"network"`
 }
 type identityData struct {
 	Wallets    map[string]WalletAccount     `json:"wallets"`
@@ -83,6 +88,7 @@ func emptyIdentityData() identityData {
 }
 
 type walletChallenge struct {
+	Environment     string `json:"-"`
 	Nonce           string `json:"nonce"`
 	Message         string `json:"message"`
 	IssuedAt        int64  `json:"issuedAt"`
@@ -93,15 +99,16 @@ type walletChallenge struct {
 	Binding         string `json:"-"`
 }
 type identityConfig struct {
-	Environment                string
-	CanonicalEnvironment       bool
-	Development                bool
-	DevEnabled                 bool
-	LegacyEnabled              bool
-	OwnershipAcceptanceEnabled bool
-	Origin                     string
-	Origins                    map[string]bool
-	Assets                     map[string]bool
+	StagingCharacterInscriptionID string
+	Environment                   string
+	CanonicalEnvironment          bool
+	Development                   bool
+	DevEnabled                    bool
+	LegacyEnabled                 bool
+	OwnershipAcceptanceEnabled    bool
+	Origin                        string
+	Origins                       map[string]bool
+	Assets                        map[string]bool
 }
 type identityService struct {
 	// A fresh cryptographically random epoch deliberately invalidates all wallet
@@ -139,9 +146,12 @@ func identityConfigForRuntime(runtime RuntimeConfig, err error) identityConfig {
 	}
 	for _, v := range strings.Split(os.Getenv("FT_CHARACTER_INSCRIPTION_ALLOWLIST"), ",") {
 		v = strings.TrimSpace(v)
-		if inscriptionIDPattern.MatchString(v) {
+		if inscriptionIDPattern.MatchString(v) && v != stagingCharacterInscriptionID {
 			c.Assets[v] = true
 		}
+	}
+	if err == nil && c.Environment == "staging" && c.CanonicalEnvironment && os.Getenv("FREETOWER_STAGING_CHARACTER_INSCRIPTION_ID") == stagingCharacterInscriptionID {
+		c.StagingCharacterInscriptionID = stagingCharacterInscriptionID
 	}
 	return c
 }
@@ -162,7 +172,7 @@ func newIdentityService() *identityService {
 	return newIdentityServiceWithConfig(loadIdentityConfig())
 }
 func newIdentityServiceWithConfig(c identityConfig) *identityService {
-	return &identityService{bootID: newID(), config: c, challenges: map[string]walletChallenge{}, assets: &UniSatFractalOrdinalsProvider{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY"), allow: c.Assets}, names: &FractalNameResolver{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY")}, verify: verifyBIP322}
+	return &identityService{bootID: newID(), config: c, challenges: map[string]walletChallenge{}, assets: &UniSatFractalOrdinalsProvider{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY"), allow: c.Assets, stagingID: c.stagingAssetID()}, names: &FractalNameResolver{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY")}, verify: verifyBIP322}
 }
 func identityUser(i CharacterIdentity) User {
 	mode := "wallet"
@@ -170,4 +180,22 @@ func identityUser(i CharacterIdentity) User {
 		mode = "dev"
 	}
 	return User{ID: i.ID, Username: i.BtcName, CharacterIdentityID: i.ID, BtcName: i.BtcName, CharacterAssetID: i.CharacterAssetID, IdentityMode: mode, Avatar: i.Avatar}
+}
+
+// Staging authority is deliberately separate from the production allowlist.
+func (c identityConfig) stagingAssetID() string {
+	if c.Environment == "staging" && c.CanonicalEnvironment && c.StagingCharacterInscriptionID == stagingCharacterInscriptionID {
+		return stagingCharacterInscriptionID
+	}
+	return ""
+}
+func (c identityConfig) environmentMatches(environment string) bool {
+	switch c.Environment {
+	case "development", "test", "staging", "production":
+		return environment == c.Environment
+	}
+	return false
+}
+func (c identityConfig) identityAllowed(i CharacterIdentity) bool {
+	return c.environmentMatches(i.Environment) && (!i.Dev || c.DevEnabled) && (i.CharacterAssetID != stagingCharacterInscriptionID || c.stagingAssetID() == stagingCharacterInscriptionID)
 }

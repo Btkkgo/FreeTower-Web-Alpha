@@ -32,7 +32,7 @@ func (a *App) identityOptions(w http.ResponseWriter, r *http.Request) {
 	// The service boundary independently checks provider output before exposing choices.
 	filtered := []CharacterAsset{}
 	for _, v := range available {
-		if v.Owner == account.Address && v.Status == "eligible" && v.AssetID != "" {
+		if (v.AssetID != stagingCharacterInscriptionID || a.identity.config.stagingAssetID() == stagingCharacterInscriptionID) && v.Owner == account.Address && v.Status == "eligible" && v.AssetID != "" {
 			filtered = append(filtered, v)
 		}
 	}
@@ -82,6 +82,10 @@ func (a *App) identitySelect(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	assets, names := a.identityProviders(account)
+	if body.AssetID == stagingCharacterInscriptionID && a.identity.config.stagingAssetID() != stagingCharacterInscriptionID {
+		identityError(w, 403, "asset_invalid", "Character is not eligible in this environment")
+		return
+	}
 	ok, e := assets.VerifyOwnership(ctx, account.Address, body.AssetID)
 	if e != nil {
 		identityError(w, 503, "asset_verification_unavailable", "Character ownership verification unavailable")
@@ -124,17 +128,17 @@ func (a *App) identitySelect(w http.ResponseWriter, r *http.Request) {
 	var selected CharacterIdentity
 	_, e = a.store.identityState(ctx, func(d *identityData) error {
 		current, _, e := readWalletSession(*d, hash)
-		if e != nil || current.WalletID != session.WalletID || current.BootID != a.identity.bootID || a.identity.sessionRevoked(hash) {
+		if e != nil || !a.identity.config.environmentMatches(current.Environment) || current.WalletID != session.WalletID || current.BootID != a.identity.bootID || a.identity.sessionRevoked(hash) {
 			return errNotFound
 		}
 		for _, i := range d.Identities {
-			if i.WalletAccountID == account.ID && i.CharacterAssetID == body.AssetID {
+			if i.WalletAccountID == account.ID && i.CharacterAssetID == body.AssetID && a.identity.config.identityAllowed(i) {
 				selected = i
 				break
 			}
 		}
 		if selected.ID == "" {
-			selected = CharacterIdentity{ID: newID(), WalletAccountID: account.ID, CharacterAssetID: body.AssetID, CreatedAt: nowMS(), Dev: account.Dev}
+			selected = CharacterIdentity{Environment: a.identity.config.Environment, StagingTestCharacter: body.AssetID == a.identity.config.stagingAssetID(), ID: newID(), WalletAccountID: account.ID, CharacterAssetID: body.AssetID, CreatedAt: nowMS(), Dev: account.Dev}
 		}
 		selected.BtcName = body.Name
 		selected.Provider = forward.Provider
@@ -163,7 +167,7 @@ func (a *App) invalidateSelection(ctx context.Context, walletID, asset, name, st
 	revoked := map[string]bool{sessionHash: true}
 	_, e := a.store.identityState(ctx, func(d *identityData) error {
 		for id, i := range d.Identities {
-			if i.WalletAccountID == walletID && ((asset != "" && i.CharacterAssetID == asset) || (name != "" && i.BtcName == name)) {
+			if a.identity.config.identityAllowed(i) && i.WalletAccountID == walletID && ((asset != "" && i.CharacterAssetID == asset) || (name != "" && i.BtcName == name)) {
 				i.Status = status
 				d.Identities[id] = i
 				for hash, s := range d.Sessions {

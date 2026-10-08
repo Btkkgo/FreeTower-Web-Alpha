@@ -97,14 +97,14 @@ func (a *App) walletCurrent(ctx context.Context, hash string) (walletSession, Wa
 	if e != nil {
 		return s, w, nil, e
 	}
-	if a.identity.bootID == "" || s.BootID != a.identity.bootID {
+	if !a.identity.config.environmentMatches(s.Environment) || a.identity.bootID == "" || s.BootID != a.identity.bootID {
 		return s, w, nil, errNotFound
 	}
 	if w.Dev && !a.identity.config.DevEnabled {
 		return s, w, nil, errNotFound
 	}
 	var i *CharacterIdentity
-	if candidate, ok := d.Identities[s.IdentityID]; ok && candidate.Status == "active" && candidate.WalletAccountID == w.ID {
+	if candidate, ok := d.Identities[s.IdentityID]; ok && candidate.Status == "active" && candidate.WalletAccountID == w.ID && a.identity.config.identityAllowed(candidate) {
 		i = &candidate
 	}
 	return s, w, i, nil
