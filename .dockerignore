@@ -16,3 +16,19 @@ compose.yaml
 
 docs
 little-flock-trailer
+.superpowers
+.codex
+attachments
+coverage
+**/*.test.ts
+server/*_test.go
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.pem
+**/*.key
+**/.env
+**/.env.*
+**/node_modules
+**/.git
+**/data

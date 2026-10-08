@@ -93,6 +93,8 @@ type walletChallenge struct {
 	Binding         string `json:"-"`
 }
 type identityConfig struct {
+	Environment                string
+	CanonicalEnvironment       bool
 	Development                bool
 	DevEnabled                 bool
 	LegacyEnabled              bool
@@ -116,11 +118,19 @@ type identityService struct {
 }
 
 func loadIdentityConfig() identityConfig {
-	c := identityConfig{Development: os.Getenv("FT_ENV") == "development", Origin: os.Getenv("FT_PUBLIC_ORIGIN"), Origins: map[string]bool{}, Assets: map[string]bool{}}
+	runtime, err := loadRuntimeConfig(os.LookupEnv)
+	return identityConfigForRuntime(runtime, err)
+}
+func identityConfigForRuntime(runtime RuntimeConfig, err error) identityConfig {
+	c := identityConfig{Environment: runtime.Environment, CanonicalEnvironment: runtime.CanonicalEnvironment, Development: err == nil && runtime.Environment == "development" && runtimeSetting(os.LookupEnv, "FREETOWER_ENV", "FT_ENV") == "development", Origin: runtime.PublicOrigin, Origins: map[string]bool{}, Assets: map[string]bool{}}
 	c.DevEnabled = c.Development && os.Getenv("FT_ENABLE_DEV_IDENTITY") == "true"
 	c.LegacyEnabled = c.Development && os.Getenv("FT_ENABLE_LEGACY_AUTH") == "true"
 	c.OwnershipAcceptanceEnabled = c.Development && os.Getenv("FT_ENABLE_OWNERSHIP_ACCEPTANCE") == "true"
-	for _, raw := range append(strings.Split(os.Getenv("FT_ALLOWED_ORIGINS"), ","), c.Origin) {
+	origins := []string{c.Origin}
+	if !runtime.Public() && err == nil {
+		origins = append(origins, strings.Split(os.Getenv("FT_ALLOWED_ORIGINS"), ",")...)
+	}
+	for _, raw := range origins {
 		raw = strings.TrimSpace(raw)
 		u, e := url.Parse(raw)
 		if e == nil && u.Host != "" && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (c.Development && u.Scheme == "http" && loopbackHost(u.Hostname()))) {
@@ -149,7 +159,9 @@ func (s *identityService) devAllowed(r *http.Request) bool {
 	return s.config.DevEnabled && loopbackHost(remoteKey(r)) && s.originAllowed(r)
 }
 func newIdentityService() *identityService {
-	c := loadIdentityConfig()
+	return newIdentityServiceWithConfig(loadIdentityConfig())
+}
+func newIdentityServiceWithConfig(c identityConfig) *identityService {
 	return &identityService{bootID: newID(), config: c, challenges: map[string]walletChallenge{}, assets: &UniSatFractalOrdinalsProvider{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY"), allow: c.Assets}, names: &FractalNameResolver{http: providerHTTP(), key: os.Getenv("UNISAT_FRACTAL_API_KEY")}, verify: verifyBIP322}
 }
 func identityUser(i CharacterIdentity) User {

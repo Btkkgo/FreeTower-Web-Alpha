@@ -86,6 +86,13 @@ var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 4096, C
 func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	// Serialize registration against logout/re-auth so an upgrade cannot escape revocation.
 	a.identity.mu.Lock()
+	if a.closing {
+		a.identity.mu.Unlock()
+		jsonError(w, 503, "FreeTower is restarting")
+		return
+	}
+	a.websocketDone.Add(1)
+	defer a.websocketDone.Done()
 	locked := true
 	defer func() {
 		if locked {
@@ -115,7 +122,9 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 429, "农场当前连接较多，稍后再来吧")
 		return
 	}
-	conn, err := upgrader.Upgrade(w, r, nil)
+	upgrade := upgrader
+	upgrade.CheckOrigin = a.runtime.originAllowed
+	conn, err := upgrade.Upgrade(w, r, nil)
 	if err != nil {
 		rr.mu.Unlock()
 		return
@@ -165,8 +174,8 @@ func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	rr.tick(nowMS())
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	_ = rr.advanceBuildings(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
+	_ = rr.advanceLife(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) })
 	cancel()
-	_ = rr.advanceLife(nowMS(), false, c, func(record RoomRecord) error { return a.store.saveRoom(context.Background(), record) })
 	delete(rr.clients, c)
 	delete(rr.lifeReplaySync, c)
 	delete(rr.lifeReplayReply, c)

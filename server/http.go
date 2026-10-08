@@ -33,24 +33,38 @@ type RuntimeRoom struct {
 	lastPersist      int64
 }
 type App struct {
-	identity   *identityService
-	store      *Store
-	mu         sync.RWMutex
-	rooms      map[string]*RuntimeRoom
-	limiter    limiter
-	staticDir  string
-	stop       chan struct{}
-	tickerDone chan struct{}
+	closing       bool // guarded by identity.mu
+	websocketDone sync.WaitGroup
+	shutdownOnce  sync.Once
+	runtime       RuntimeConfig
+	identity      *identityService
+	store         *Store
+	mu            sync.RWMutex
+	rooms         map[string]*RuntimeRoom
+	limiter       limiter
+	staticDir     string
+	stop          chan struct{}
+	tickerDone    chan struct{}
 }
 
 func newApp(store *Store, staticDir string) (*App, error) {
+	runtime, err := loadRuntimeConfig(os.LookupEnv)
+	if err != nil {
+		return nil, err
+	}
+	return newAppWithConfig(store, staticDir, runtime)
+}
+func newAppWithConfig(store *Store, staticDir string, runtime RuntimeConfig) (*App, error) {
+	if runtime.RequireDatabase && store.db == nil {
+		return nil, errors.New("runtime requires PostgreSQL")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	records, err := store.loadRooms(ctx)
 	if err != nil {
 		return nil, err
 	}
-	a := &App{identity: newIdentityService(), store: store, rooms: map[string]*RuntimeRoom{}, staticDir: staticDir, stop: make(chan struct{}), tickerDone: make(chan struct{})}
+	a := &App{runtime: runtime, identity: newIdentityServiceWithConfig(identityConfigForRuntime(runtime, nil)), store: store, rooms: map[string]*RuntimeRoom{}, staticDir: staticDir, stop: make(chan struct{}), tickerDone: make(chan struct{})}
 	for _, r := range records {
 		r.State.UpdatedAt = nowMS()
 		r.Room.OnlineCount = 0
@@ -73,11 +87,16 @@ func (a *App) routes() http.Handler {
 			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 			defer cancel()
 			if err := a.store.db.Ping(ctx); err != nil {
-				jsonError(w, 503, "数据库连接暂时不可用")
+				writeJSON(w, 503, map[string]any{"ok": false, "database": false, "environment": a.runtime.Environment, "commit": a.runtime.GitSHA})
 				return
 			}
 		}
-		writeJSON(w, 200, map[string]any{"ok": true, "service": "little-flock", "time": nowMS()})
+		connected := a.store.db != nil
+		status := 200
+		if a.runtime.RequireDatabase && !connected {
+			status = 503
+		}
+		writeJSON(w, status, map[string]any{"ok": status == 200, "database": connected, "environment": a.runtime.Environment, "commit": a.runtime.GitSHA})
 	})
 	a.identityRoutes(mux)
 	mux.HandleFunc("/api/auth/{action}", a.auth)
@@ -94,11 +113,20 @@ func (a *App) routes() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		w.Header().Set("X-Frame-Options", "DENY")
+		connectSource := "'self' ws: wss:"
+		if a.runtime.Public() {
+			connectSource = "'self' " + strings.Replace(a.runtime.PublicOrigin, "https://", "wss://", 1)
+		}
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src "+connectSource+"; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
-			if r.Method != "GET" && !sameOrigin(r) {
+			if (r.Method != "GET" && r.Method != "HEAD" || a.runtime.Public() && strings.HasSuffix(r.URL.Path, "/ws")) && !a.runtime.originAllowed(r) {
 				jsonError(w, 403, "请从农场页面进行操作")
+				return
+			}
+			if a.runtime.Public() && (strings.HasPrefix(r.URL.Path, "/api/identity/") || r.Method != "GET") && !a.limiter.allow("public:"+remoteKey(r), 180, time.Minute) {
+				jsonError(w, 429, "Please retry shortly")
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
@@ -144,7 +172,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func (a *App) internal(w http.ResponseWriter, err error) {
-	log.Printf("request failed: %v", err)
+	log.Print("request failed")
 	jsonError(w, 500, "保存暂时遇到问题，请稍后再试。你的操作还没有扣费")
 }
 func (a *App) requireUser(w http.ResponseWriter, r *http.Request) (User, bool) {
@@ -469,13 +497,13 @@ func (a *App) runTicker() {
 				at := nowMS()
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				if err := rr.advanceBuildings(at, false, nil, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
-					log.Printf("building timer save failed: %v", err)
+					log.Print("building timer save failed")
 				}
 				if err := rr.advanceLife(at, false, nil, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
-					log.Printf("life timer save failed: %v", err)
+					log.Print("life timer save failed")
 				}
 				if err := rr.respawnGathering(at, func(record RoomRecord) error { return a.store.saveRoom(ctx, record) }); err != nil {
-					log.Printf("resource respawn save failed: %v", err)
+					log.Print("resource respawn save failed")
 				}
 				cancel()
 				if rr.expireGatherActions(at) {
@@ -490,7 +518,7 @@ func (a *App) runTicker() {
 						err := a.store.saveRoom(ctx, rr.record)
 						cancel()
 						if err != nil {
-							log.Printf("periodic room save failed: %v", err)
+							log.Print("periodic room save failed")
 						} else {
 							rr.lastPersist = at
 						}
@@ -502,20 +530,37 @@ func (a *App) runTicker() {
 	}
 }
 func (a *App) shutdown() {
-	close(a.stop)
-	<-a.tickerDone
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	for _, rr := range a.rooms {
-		rr.mu.Lock()
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if err := a.store.saveRoom(ctx, rr.record); err != nil {
-			log.Printf("shutdown save: %v", err)
+	a.shutdownOnce.Do(func() {
+		a.identity.mu.Lock()
+		a.closing = true
+		a.identity.mu.Unlock()
+		close(a.stop)
+		<-a.tickerDone
+		a.mu.RLock()
+		rooms := make([]*RuntimeRoom, 0, len(a.rooms))
+		for _, rr := range a.rooms {
+			rooms = append(rooms, rr)
 		}
-		cancel()
-		for c := range rr.clients {
-			c.close()
+		a.mu.RUnlock()
+		for _, rr := range rooms {
+			rr.mu.Lock()
+			for c := range rr.clients {
+				c.close()
+			}
+			rr.mu.Unlock()
 		}
-		rr.mu.Unlock()
-	}
+		// Draining websocket handlers completes their final persistence before DB close.
+		a.websocketDone.Wait()
+		for _, rr := range rooms {
+			rr.mu.Lock()
+			if !rr.deleted {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				if err := a.store.saveRoom(ctx, rr.record); err != nil {
+					log.Print("shutdown save failed")
+				}
+				cancel()
+			}
+			rr.mu.Unlock()
+		}
+	})
 }

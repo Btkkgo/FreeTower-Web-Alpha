@@ -17,20 +17,24 @@ func env(key, fallback string) string {
 	return fallback
 }
 func main() {
-	store, err := openStore(os.Getenv("DATABASE_URL"), env("SAVE_PATH", "data/farm.json"))
+	runtime, err := loadRuntimeConfig(os.LookupEnv)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer store.close()
-	app, err := newApp(store, env("STATIC_DIR", "../dist"))
+	store, err := openStore(os.Getenv("DATABASE_URL"), env("SAVE_PATH", "data/farm.json"))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("FreeTower database initialization failed")
+	}
+	defer store.close()
+	app, err := newAppWithConfig(store, env("STATIC_DIR", "../dist"), runtime)
+	if err != nil {
+		log.Fatal("FreeTower initialization failed")
 	}
 	srv := &http.Server{Addr: ":" + env("PORT", "8080"), Handler: app.routes(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second}
 	go func() {
-		log.Printf("Little Flock listening on %s", srv.Addr)
+		log.Printf("FreeTower listening on %s", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Fatal("FreeTower HTTP server failed")
 		}
 	}()
 	signals := make(chan os.Signal, 1)

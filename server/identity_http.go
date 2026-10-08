@@ -25,7 +25,7 @@ func requestWalletHash(r *http.Request) string {
 	return tokenHash(c.Value)
 }
 func (a *App) identityCookie(w http.ResponseWriter, name, value string, maxAge int) {
-	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, Secure: !a.identity.config.Development, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
+	http.SetCookie(w, &http.Cookie{Name: name, Value: value, Path: "/", HttpOnly: true, Secure: a.runtime.Public() || !a.identity.config.Development, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
 }
 func identityError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, map[string]string{"error": message, "code": code})
