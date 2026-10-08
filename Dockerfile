@@ -5,6 +5,7 @@ RUN npm ci
 COPY index.html tsconfig.json vite.config.ts ./
 COPY public ./public
 COPY src ./src
+COPY server/freetower_world.json server/freetower_buildings.json server/freetower_resources.json server/freetower_life.json ./server/
 RUN npm run build
 
 FROM golang:1.26-alpine AS backend
