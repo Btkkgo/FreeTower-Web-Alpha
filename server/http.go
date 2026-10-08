@@ -33,18 +33,20 @@ type RuntimeRoom struct {
 	lastPersist      int64
 }
 type App struct {
-	closing       bool // guarded by identity.mu
-	websocketDone sync.WaitGroup
-	shutdownOnce  sync.Once
-	runtime       RuntimeConfig
-	identity      *identityService
-	store         *Store
-	mu            sync.RWMutex
-	rooms         map[string]*RuntimeRoom
-	limiter       limiter
-	staticDir     string
-	stop          chan struct{}
-	tickerDone    chan struct{}
+	worldWriterLost <-chan struct{}
+	worldWriterDone chan struct{}
+	closing         bool // guarded by identity.mu
+	websocketDone   sync.WaitGroup
+	shutdownOnce    sync.Once
+	runtime         RuntimeConfig
+	identity        *identityService
+	store           *Store
+	mu              sync.RWMutex
+	rooms           map[string]*RuntimeRoom
+	limiter         limiter
+	staticDir       string
+	stop            chan struct{}
+	tickerDone      chan struct{}
 }
 
 func newApp(store *Store, staticDir string) (*App, error) {
@@ -55,11 +57,24 @@ func newApp(store *Store, staticDir string) (*App, error) {
 	return newAppWithConfig(store, staticDir, runtime)
 }
 func newAppWithConfig(store *Store, staticDir string, runtime RuntimeConfig) (*App, error) {
-	if runtime.RequireDatabase && store.db == nil {
+	if (runtime.RequireDatabase || runtime.Public()) && store.db == nil {
 		return nil, errors.New("runtime requires PostgreSQL")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if runtime.Public() {
+		if err := store.acquireWorldWriter(ctx); err != nil {
+			return nil, err
+		}
+	} else if store.worldWriterClaimed() {
+		return nil, errWorldWriterUnavailable
+	}
+	initialized := false
+	defer func() {
+		if !initialized && runtime.Public() {
+			store.closeWorldWriter()
+		}
+	}()
 	records, err := store.loadRooms(ctx)
 	if err != nil {
 		return nil, err
@@ -77,6 +92,12 @@ func newAppWithConfig(store *Store, staticDir string, runtime RuntimeConfig) (*A
 		}
 		a.rooms[r.Room.ID] = rr
 	}
+	if runtime.Public() {
+		a.worldWriterLost = store.worldWriterFailure()
+		a.worldWriterDone = make(chan struct{})
+		go a.watchWorldWriter()
+	}
+	initialized = true
 	go a.runTicker()
 	return a, nil
 }
@@ -86,7 +107,13 @@ func (a *App) routes() http.Handler {
 		if a.store.db != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 			defer cancel()
-			if err := a.store.db.Ping(ctx); err != nil {
+			var err error
+			if a.runtime.Public() {
+				err = a.store.worldWriterHealthy(ctx)
+			} else {
+				err = a.store.db.Ping(ctx)
+			}
+			if err != nil {
 				writeJSON(w, 503, map[string]any{"ok": false, "database": false, "environment": a.runtime.Environment, "commit": a.runtime.GitSHA})
 				return
 			}
@@ -121,9 +148,19 @@ func (a *App) routes() http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src "+connectSource+"; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
+
 			if (r.Method != "GET" && r.Method != "HEAD" || a.runtime.Public() && strings.HasSuffix(r.URL.Path, "/ws")) && !a.runtime.originAllowed(r) {
 				jsonError(w, 403, "请从农场页面进行操作")
 				return
+			}
+			if a.runtime.Public() && strings.HasPrefix(r.URL.Path, "/api/rooms") {
+				ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+				err := a.store.worldWriterHealthy(ctx)
+				cancel()
+				if err != nil {
+					jsonError(w, 503, "FreeTower world is unavailable")
+					return
+				}
 			}
 			if a.runtime.Public() && (strings.HasPrefix(r.URL.Path, "/api/identity/") || r.Method != "GET") && !a.limiter.allow("public:"+remoteKey(r), 180, time.Minute) {
 				jsonError(w, 429, "Please retry shortly")
@@ -481,6 +518,8 @@ func (a *App) runTicker() {
 		select {
 		case <-a.stop:
 			return
+		case <-a.worldWriterLost:
+			return
 		case <-ticker.C:
 			a.mu.RLock()
 			rooms := make([]*RuntimeRoom, 0, len(a.rooms))
@@ -536,6 +575,9 @@ func (a *App) shutdown() {
 		a.identity.mu.Unlock()
 		close(a.stop)
 		<-a.tickerDone
+		if a.worldWriterDone != nil {
+			<-a.worldWriterDone
+		}
 		a.mu.RLock()
 		rooms := make([]*RuntimeRoom, 0, len(a.rooms))
 		for _, rr := range a.rooms {

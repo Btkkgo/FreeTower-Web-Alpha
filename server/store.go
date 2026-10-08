@@ -25,10 +25,11 @@ type diskData struct {
 	Rooms    map[string]json.RawMessage `json:"rooms"`
 }
 type Store struct {
-	mu   sync.Mutex
-	path string
-	data diskData
-	db   *pgxpool.Pool
+	worldWriter worldWriterState
+	mu          sync.Mutex
+	path        string
+	data        diskData
+	db          *pgxpool.Pool
 }
 
 func openStore(databaseURL, path string) (*Store, error) {
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS sheep_rooms (id TEXT PRIMARY KEY, code TEXT NOT NULL 
 	return s, nil
 }
 func (s *Store) close() {
+	s.closeWorldWriter()
 	if s.db != nil {
 		s.db.Close()
 	}
@@ -192,7 +194,7 @@ func (s *Store) saveRoom(ctx context.Context, r RoomRecord) error {
 		return err
 	}
 	if s.db != nil {
-		_, err = s.db.Exec(ctx, `INSERT INTO sheep_rooms(id,code,data) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=now()`, r.Room.ID, r.Room.Code, b)
+		_, err = s.worldExec(ctx, `INSERT INTO sheep_rooms(id,code,data) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=now()`, r.Room.ID, r.Room.Code, b)
 		return err
 	}
 	s.mu.Lock()
@@ -211,23 +213,7 @@ func (s *Store) saveRoom(ctx context.Context, r RoomRecord) error {
 func (s *Store) loadRooms(ctx context.Context) ([]RoomRecord, error) {
 	out := []RoomRecord{}
 	if s.db != nil {
-		rows, err := s.db.Query(ctx, `SELECT data FROM sheep_rooms ORDER BY updated_at DESC`)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var b []byte
-			if err = rows.Scan(&b); err != nil {
-				return nil, err
-			}
-			var r RoomRecord
-			if err = json.Unmarshal(b, &r); err != nil {
-				return nil, err
-			}
-			out = append(out, r)
-		}
-		return out, rows.Err()
+		return s.loadDatabaseRooms(ctx)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -269,7 +255,7 @@ func (s *Store) updateAvatar(ctx context.Context, userID string, avatar AvatarAp
 
 func (s *Store) deleteRoom(ctx context.Context, id string) error {
 	if s.db != nil {
-		_, err := s.db.Exec(ctx, `DELETE FROM sheep_rooms WHERE id=$1`, id)
+		_, err := s.worldExec(ctx, `DELETE FROM sheep_rooms WHERE id=$1`, id)
 		return err
 	}
 	s.mu.Lock()

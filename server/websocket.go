@@ -86,7 +86,7 @@ var upgrader = websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 4096, C
 func (a *App) websocket(w http.ResponseWriter, r *http.Request) {
 	// Serialize registration against logout/re-auth so an upgrade cannot escape revocation.
 	a.identity.mu.Lock()
-	if a.closing {
+	if a.closing || a.runtime.Public() && !a.store.worldWriterActive() {
 		a.identity.mu.Unlock()
 		jsonError(w, 503, "FreeTower is restarting")
 		return
@@ -226,6 +226,9 @@ func (c *Client) readPump(a *App, rr *RuntimeRoom) {
 			case <-c.done:
 				return true
 			default:
+			}
+			if a.runtime.Public() && !a.store.worldWriterActive() {
+				return true
 			}
 			if c.sessionHash != "" {
 				_, _, i, e := a.walletCurrent(context.Background(), c.sessionHash)
